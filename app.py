@@ -53,55 +53,45 @@ def load_encodings():
 def luu_nguoi_la(frame, ket_qua):
     os.makedirs("unknown_log", exist_ok=True)
     ten_file = datetime.now().strftime("%Y%m%d_%H%M%S") + ".jpg"
+    anh_luu = frame.copy()
 
-    # Vẽ thông tin lên ảnh trước khi lưu
-    ảnh_luu = frame.copy()
-
-    # Vẽ khung đỏ cho người lạ, xảnh cho người quen
+    # Vẽ khung xanh cho người quen, đỏ cho người lạ
     for (box, ten, do_cx, mau) in ket_qua:
-        cv2.rectangle(ảnh_luu,
-                      (box[0], box[1]), (box[2], box[3]), mau, 2)
-        cv2.rectangle(ảnh_luu,
-                      (box[0], box[3] - 32), (box[2], box[3]),
-                      mau, cv2.FILLED)
+        cv2.rectangle(anh_luu, (box[0], box[1]), (box[2], box[3]), mau, 2)
+        cv2.rectangle(anh_luu, (box[0], box[3] - 32), (box[2], box[3]), mau, cv2.FILLED)
         nhan = ten if ten == "NGUOI LA" else f"{ten} ({do_cx:.0f}%)"
-        cv2.putText(ảnh_luu, nhan,
-                    (box[0] + 4, box[3] - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.55,
-                    (255, 255, 255), 1)
+        cv2.putText(anh_luu, nhan, (box[0] + 4, box[3] - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
 
     # Vẽ timestamp góc trên trái
     gio = datetime.now().strftime("%d/%m/%Y  %H:%M:%S")
-    cv2.rectangle(ảnh_luu, (0, 0), (280, 28), (0, 0, 0), cv2.FILLED)
-    cv2.putText(ảnh_luu, gio,
-                (6, 20), cv2.FONT_HERSHEY_SIMPLEX,
+    cv2.rectangle(anh_luu, (0, 0), (280, 28), (0, 0, 0), cv2.FILLED)
+    cv2.putText(anh_luu, gio, (6, 20), cv2.FONT_HERSHEY_SIMPLEX,
                 0.6, (255, 255, 0), 1)
 
-    cv2.imwrite(f"unknown_log/{ten_file}", ảnh_luu)
+    cv2.imwrite(f"unknown_log/{ten_file}", anh_luu)
     return ten_file
+
 
 class App:
     def __init__(self, root):
         self.root  = root
-        self.root.title("He thong nhan dien nguoi la")
+        self.root.title("Hệ Thống Nhận Diện Người Lạ")
         self.root.configure(bg=BG_MAIN)
         self.root.resizable(False, False)
 
-        # Căn giữa màn hình với kích thước cố định
         w, h = 1200, 700
         sw   = self.root.winfo_screenwidth()
         sh   = self.root.winfo_screenheight()
-        x    = (sw - w) // 2
-        y    = (sh - h) // 2
-        self.root.geometry(f"{w}x{h}+{x}+{y}")
+        self.root.geometry(f"{w}x{h}+{(sw-w)//2}+{(sh-h)//2}")
 
         self.dang_chay          = False
         self.cap                = None
         self.dem_frame          = 0
-        self.thoi_gian_cảnh_bao = 0
+        self.thoi_gian_canh_bao = 0
         self.bo_dem_on_dinh     = {}
         self.ket_qua_hien_tai   = []
-        self.tong_cảnh_bao      = 0
+        self.tong_canh_bao      = 0
         self.app_insight        = None
         self.known_embeddings   = []
         self.known_names        = []
@@ -111,20 +101,17 @@ class App:
         self._load_model_thread()
 
     def _card(self, parent, **kwargs):
-        return tk.Frame(parent, bg=BG_CARD,
-                        relief="flat",
+        return tk.Frame(parent, bg=BG_CARD, relief="flat",
                         highlightthickness=1,
-                        highlightbackground="#DADCE0",
-                        **kwargs)
+                        highlightbackground="#DADCE0", **kwargs)
 
     def _build_ui(self):
-        # ── Header ──
+        # Header
         header = tk.Frame(self.root, bg=BG_HEADER, height=52)
         header.pack(fill="x")
         header.pack_propagate(False)
 
-        tk.Label(header,
-                 text="  🏠  Hệ Thống Nhận Diện Người Lạ",
+        tk.Label(header, text="  🏠  Hệ Thống Nhận Diện Người Lạ",
                  bg=BG_HEADER, fg="white",
                  font=("Segoe UI", 14, "bold")).pack(side="left", pady=10)
 
@@ -134,37 +121,30 @@ class App:
         self.label_gio.pack(side="right", padx=16)
         self._cap_nhat_gio()
 
-        # ── Body ──
+        # Body
         body = tk.Frame(self.root, bg=BG_MAIN)
         body.pack(fill="both", expand=True, padx=12, pady=10)
 
-        # ═══ CỘT TRÁI: Camera ═══
+        # Cột trái: Camera
         col_trai = tk.Frame(body, bg=BG_MAIN)
         col_trai.pack(side="left", fill="both", expand=True)
 
-        # Card camera
         card_cam = self._card(col_trai)
         card_cam.pack(fill="both", expand=True, pady=(0, 8))
 
-        tk.Label(card_cam,
-                 text="📷  Camera Giám Sát",
+        tk.Label(card_cam, text="📷  Camera Giám Sát",
                  bg=BG_CARD, fg=CLR_TEXT,
                  font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=12, pady=(10, 4))
-
         tk.Frame(card_cam, bg="#DADCE0", height=1).pack(fill="x", padx=12)
 
-        # Frame cố định pixel cho camera
-        frame_cam_inner = tk.Frame(card_cam, bg="#000000",
-                                    width=640, height=480)
+        frame_cam_inner = tk.Frame(card_cam, bg="#000000", width=640, height=480)
         frame_cam_inner.pack(padx=12, pady=8)
-        frame_cam_inner.pack_propagate(False)  # giữ nguyên kích thước
+        frame_cam_inner.pack_propagate(False)
 
         self.label_camera = tk.Label(frame_cam_inner, bg="#000000")
         self.label_camera.pack(fill="both", expand=True)
-        self.label_camera.pack_forget()  # reset trước khi pack lại bên dưới
-        self.label_camera.pack(fill="both", expand=True)
 
-        # Card thống kê dưới camera
+        # Thống kê
         card_stat = self._card(col_trai)
         card_stat.pack(fill="x")
 
@@ -172,27 +152,25 @@ class App:
         frame_stat.pack(fill="x", padx=12, pady=8)
 
         stats = [
-            ("Khuôn mặt",   "0", CLR_BLUE,   "label_so_mat"),
-            ("Người quen",  "0", CLR_GREEN,  "label_so_quen"),
-            ("Người lạ",    "0", CLR_RED,    "label_so_la"),
-            ("DB (ảnh)",    "...", CLR_ORANGE, "label_db"),
+            ("Khuôn mặt", "0",   CLR_BLUE,   "label_so_mat"),
+            ("Người quen", "0",  CLR_GREEN,  "label_so_quen"),
+            ("Người lạ",   "0",  CLR_RED,    "label_so_la"),
+            ("DB (ảnh)",   "...", CLR_ORANGE, "label_db"),
         ]
         for i, (nhan, val, mau, attr) in enumerate(stats):
             f = tk.Frame(frame_stat, bg=BG_CARD)
             f.pack(side="left", expand=True)
-            lbl_val = tk.Label(f, text=val,
-                                bg=BG_CARD, fg=mau,
+            lbl_val = tk.Label(f, text=val, bg=BG_CARD, fg=mau,
                                 font=("Segoe UI", 20, "bold"))
             lbl_val.pack()
-            tk.Label(f, text=nhan,
-                     bg=BG_CARD, fg=CLR_SUB,
+            tk.Label(f, text=nhan, bg=BG_CARD, fg=CLR_SUB,
                      font=("Segoe UI", 8)).pack()
             setattr(self, attr, lbl_val)
             if i < len(stats) - 1:
                 tk.Frame(frame_stat, bg="#DADCE0",
                          width=1).pack(side="left", fill="y", padx=8)
 
-        # ═══ CỘT PHẢI: Điều khiển ═══
+        # Cột phải: Điều khiển
         col_phai = tk.Frame(body, bg=BG_MAIN, width=300)
         col_phai.pack(side="left", fill="y", padx=(10, 0))
         col_phai.pack_propagate(False)
@@ -211,7 +189,7 @@ class App:
             bg=CLR_LIGHT, fg=CLR_BLUE,
             font=("Segoe UI", 9),
             relief="flat", padx=8, pady=6,
-            wraplength=220, justify="left"
+            wraplength=260, justify="left"
         )
         self.label_trang_thai.pack(fill="x", padx=12, pady=8)
 
@@ -234,8 +212,7 @@ class App:
             relief="flat", pady=7, cursor="hand2",
             state="disabled", bd=0,
             activebackground="#2D9142",
-            command=self.bat_dau
-        )
+            command=self.bat_dau)
         self.btn_bat_dau.pack(fill="x", pady=2)
 
         self.btn_dung = tk.Button(
@@ -245,72 +222,33 @@ class App:
             relief="flat", pady=7, cursor="hand2",
             state="disabled", bd=0,
             activebackground="#C5221F",
-            command=self.dung_lai
-        )
+            command=self.dung_lai)
         self.btn_dung.pack(fill="x", pady=2)
 
-        tk.Button(
-            frame_btn, text="📷  Chụp Ảnh Người Quen",
-            bg=CLR_BLUE, fg="white",
-            font=("Segoe UI", 9, "bold"),
-            relief="flat", pady=6, cursor="hand2",
-            bd=0, activebackground="#1557B0",
-            command=self.chup_ảnh_nguoi_quen
-        ).pack(fill="x", pady=2)
+        for text, bg, active, cmd in [
+            ("📷  Chụp Ảnh Người Quen", CLR_BLUE,    "#1557B0", self.chup_anh_nguoi_quen),
+            ("🖼  Thêm Ảnh Từ Máy",     "#7B1FA2",   "#6A1B9A", self.them_anh_tu_may),
+            ("👥  Quản Lý Người Quen",  "#37474F",   "#263238", self.quan_ly_nguoi_quen),
+            ("📂  Xem Ảnh Người Lạ",   "#FF6D00",   "#E65100", self.xem_anh_nguoi_la),
+            ("📤  Xuất Log Ra File",    "#00897B",   "#00695C", self.xuat_log),
+        ]:
+            tk.Button(frame_btn, text=text, bg=bg, fg="white",
+                      font=("Segoe UI", 9, "bold"),
+                      relief="flat", pady=6, cursor="hand2",
+                      bd=0, activebackground=active,
+                      command=cmd).pack(fill="x", pady=2)
 
-        tk.Button(
-            frame_btn, text="🖼  Thêm Ảnh Từ Máy",
-            bg="#7B1FA2", fg="white",
-            font=("Segoe UI", 9, "bold"),
-            relief="flat", pady=6, cursor="hand2",
-            bd=0, activebackground="#6A1B9A",
-            command=self.them_ảnh_tu_may
-        ).pack(fill="x", pady=2)
+        tk.Button(frame_btn, text="🗑  Xóa Log",
+                  bg="#F1F3F4", fg=CLR_GRAY,
+                  font=("Segoe UI", 9),
+                  relief="flat", pady=6, cursor="hand2",
+                  bd=0, command=self.xoa_log).pack(fill="x", pady=2)
 
-        tk.Button(
-            frame_btn, text="👥  Quản Lý Người Quen",
-            bg="#37474F", fg="white",
-            font=("Segoe UI", 9, "bold"),
-            relief="flat", pady=6, cursor="hand2",
-            bd=0, activebackground="#263238",
-            command=self.quan_ly_nguoi_quen
-        ).pack(fill="x", pady=2)
-
-        tk.Button(
-            frame_btn, text="📂  Xem Ảnh Người Lạ",
-            bg="#FF6D00", fg="white",
-            font=("Segoe UI", 9, "bold"),
-            relief="flat", pady=6, cursor="hand2",
-            bd=0, activebackground="#E65100",
-            command=self.xem_ảnh_nguoi_la
-        ).pack(fill="x", pady=2)
-
-        tk.Button(
-            frame_btn, text="📤  Xuất Log Ra File",
-            bg="#00897B", fg="white",
-            font=("Segoe UI", 9, "bold"),
-            relief="flat", pady=6, cursor="hand2",
-            bd=0, activebackground="#00695C",
-            command=self.xuat_log
-        ).pack(fill="x", pady=2)
-
-        tk.Button(
-            frame_btn, text="🗑  Xóa Log",
-            bg="#F1F3F4", fg=CLR_GRAY,
-            font=("Segoe UI", 9),
-            relief="flat", pady=6, cursor="hand2",
-            bd=0,
-            command=self.xoa_log
-        ).pack(fill="x", pady=2)
-
-        tk.Button(
-            frame_btn, text="ℹ  Về Chúng Tôi",
-            bg="#F1F3F4", fg=CLR_GRAY,
-            font=("Segoe UI", 9),
-            relief="flat", pady=6, cursor="hand2",
-            bd=0,
-            command=self.ve_chung_toi
-        ).pack(fill="x", pady=(8, 2))
+        tk.Button(frame_btn, text="ℹ  Về Chúng Tôi",
+                  bg="#F1F3F4", fg=CLR_GRAY,
+                  font=("Segoe UI", 9),
+                  relief="flat", pady=6, cursor="hand2",
+                  bd=0, command=self.ve_chung_toi).pack(fill="x", pady=(8, 2))
 
         # Card log
         card_log = self._card(col_phai)
@@ -326,8 +264,7 @@ class App:
             bg="#FAFAFA", fg=CLR_TEXT,
             font=("Consolas", 8),
             relief="flat", state="disabled",
-            padx=6, pady=4
-        )
+            padx=6, pady=4)
         self.log_text.pack(fill="both", expand=True, padx=8, pady=8)
 
     def _load_model_thread(self):
@@ -337,25 +274,21 @@ class App:
             try:
                 self.app_insight = FaceAnalysis(
                     name="buffalo_l",
-                    providers=["CUDAExecutionProvider",
-                               "CPUExecutionProvider"]
-                )
+                    providers=["CUDAExecutionProvider", "CPUExecutionProvider"])
                 self.app_insight.prepare(ctx_id=0, det_size=(640, 640))
                 self.known_embeddings, self.known_names = load_encodings()
                 so_nguoi = len(set(self.known_names))
-                so_ảnh   = len(self.known_embeddings)
+                so_anh   = len(self.known_embeddings)
 
                 def _update():
-                    self.label_db.config(text=str(so_ảnh))
+                    self.label_db.config(text=str(so_anh))
                     self.label_so_quen.config(text=str(so_nguoi))
                     self.label_trang_thai.config(
-                        text=f"Sẵn sàng! DB: {so_ảnh} ảnh / {so_nguoi} nguoi",
+                        text=f"Sẵn sàng!\n{so_anh} ảnh / {so_nguoi} người quen",
                         bg="#E6F4EA", fg=CLR_GREEN)
                     self.btn_bat_dau.config(state="normal")
-                    self._ghi_log(
-                        f"[OK] Model sẵn sàng")
-                    self._ghi_log(
-                        f"[OK] {so_ảnh} ảnh / {so_nguoi} người quen")
+                    self._ghi_log(f"[OK] Model sẵn sàng")
+                    self._ghi_log(f"[OK] {so_anh} ảnh / {so_nguoi} người quen")
 
                 self.root.after(0, _update)
             except Exception as e:
@@ -372,8 +305,7 @@ class App:
                 "Hãy thêm người quen trước bằng cách:\n"
                 "• Nhấn '📷 Chụp Ảnh Người Quen'\n"
                 "• Hoặc '🖼 Thêm Ảnh Từ Máy'",
-                parent=self.root
-            )
+                parent=self.root)
             self._ghi_log("[!] Chưa có dữ liệu — hãy thêm người quen trước!")
             return
 
@@ -387,15 +319,13 @@ class App:
 
         self.dang_chay          = True
         self.dem_frame          = 0
-        self.thoi_gian_cảnh_bao = 0
+        self.thoi_gian_canh_bao = 0
         self.bo_dem_on_dinh     = {}
         self.ket_qua_hien_tai   = []
 
         self.btn_bat_dau.config(state="disabled")
         self.btn_dung.config(state="normal")
-        self.label_trang_thai.config(
-            text="Đang theo dõi...",
-            bg=CLR_LIGHT, fg=CLR_BLUE)
+        self.label_trang_thai.config(text="Đang theo dõi...", bg=CLR_LIGHT, fg=CLR_BLUE)
         self._ghi_log("[>>] Bắt đầu theo dõi!")
         self._cap_nhat_camera()
 
@@ -406,14 +336,11 @@ class App:
         self.label_camera.config(image="", bg="#000000")
         self.btn_bat_dau.config(state="normal")
         self.btn_dung.config(state="disabled")
-        self.label_trang_thai.config(
-            text="Đã dừng.", bg="#FCE8E6", fg=CLR_RED)
+        self.label_trang_thai.config(text="Đã dừng.", bg="#FCE8E6", fg=CLR_RED)
         self.label_so_mat.config(text="0")
         self._ghi_log("[■] Đã dừng theo dõi.")
 
-    def chup_ảnh_nguoi_quen(self):
-        """Mở cửa sổ chụp ảnh người quen"""
-        # Dừng camera chính nếu đang chạy
+    def chup_anh_nguoi_quen(self):
         tam_dung = self.dang_chay
         if self.dang_chay:
             self.dang_chay = False
@@ -424,16 +351,14 @@ class App:
             self._ghi_log("[~] Tạm dừng camera chính.")
 
         win = tk.Toplevel(self.root)
-        win.title("Chup Anh Nguoi Quen")
+        win.title("Chụp Ảnh Người Quen")
         win.configure(bg=BG_MAIN)
         win.resizable(False, False)
 
-        # Header
         tk.Label(win, text="📷  Chụp Ảnh Người Quen",
                  bg=BG_HEADER, fg="white",
                  font=("Segoe UI", 12, "bold")).pack(fill="x", ipady=8)
 
-        # Nhập tên
         frame_ten = tk.Frame(win, bg=BG_MAIN)
         frame_ten.pack(fill="x", padx=12, pady=6)
         tk.Label(frame_ten, text="Tên người:",
@@ -443,25 +368,20 @@ class App:
         entry_ten.pack(side="left", padx=8)
         entry_ten.focus()
 
-        # Camera — dùng frame cố định pixel
         frame_cam = tk.Frame(win, bg="#000000", width=640, height=420)
         frame_cam.pack(padx=12, pady=4)
         frame_cam.pack_propagate(False)
         label_preview = tk.Label(frame_cam, bg="#000000")
         label_preview.pack(fill="both", expand=True)
 
-        # Info
         label_info = tk.Label(win,
                                text="Nhập tên → Bắt Đầu → Nhấn S để chụp",
                                bg=BG_MAIN, fg=CLR_BLUE,
                                font=("Segoe UI", 9, "bold"))
         label_info.pack(pady=2)
 
-        state = {
-            "chup": False, "cap": None,
-            "dem": 0, "so_cu": 0,
-            "ten": "", "frame": None
-        }
+        state = {"chup": False, "cap": None, "dem": 0,
+                 "so_cu": 0, "ten": "", "frame": None}
 
         def bat_dau():
             ten = entry_ten.get().strip().replace(" ", "_")
@@ -474,15 +394,13 @@ class App:
             os.makedirs(f"known_faces/{ten}", exist_ok=True)
             state["so_cu"] = len([
                 f for f in os.listdir(f"known_faces/{ten}")
-                if f.endswith(".jpg")
-            ])
+                if f.endswith(".jpg")])
             state["cap"] = cv2.VideoCapture(0)
             state["cap"].set(cv2.CAP_PROP_FRAME_WIDTH,  640)
             state["cap"].set(cv2.CAP_PROP_FRAME_HEIGHT, 420)
             btn_bat_dau.config(state="disabled")
             btn_chup.config(state="normal")
-            label_info.config(
-                text=f"Nhấn S để chụp | 0 ảnh", fg=CLR_GREEN)
+            label_info.config(text="Nhấn S để chụp | 0 ảnh", fg=CLR_GREEN)
             _loop()
 
         def _loop():
@@ -492,8 +410,7 @@ class App:
             if ret:
                 state["frame"] = frame
                 img   = Image.fromarray(
-                    cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                ).resize((640, 420))
+                    cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)).resize((640, 420))
                 imgtk = ImageTk.PhotoImage(img)
                 label_preview.imgtk = imgtk
                 label_preview.config(image=imgtk)
@@ -502,8 +419,8 @@ class App:
         def chup():
             if not state["chup"] or state["frame"] is None:
                 return
-            so  = state["so_cu"] + state["dem"] + 1
-            p   = f"known_faces/{state['ten']}/{state['ten']}_{so}.jpg"
+            so = state["so_cu"] + state["dem"] + 1
+            p  = f"known_faces/{state['ten']}/{state['ten']}_{so}.jpg"
             Image.fromarray(
                 cv2.cvtColor(state["frame"], cv2.COLOR_BGR2RGB)
             ).save(p, format="JPEG", quality=95)
@@ -517,8 +434,7 @@ class App:
             if state["cap"]:
                 state["cap"].release()
             if state["dem"] > 0:
-                self._ghi_log(
-                    f"[OK] Đã chụp {state['dem']} ảnh cho '{state['ten']}'")
+                self._ghi_log(f"[OK] Đã chụp {state['dem']} ảnh cho '{state['ten']}'")
                 self._cap_nhat_encoding_silent()
             if tam_dung:
                 self.root.after(800, self.bat_dau)
@@ -538,94 +454,73 @@ class App:
         frame_btn = tk.Frame(win, bg=BG_MAIN)
         frame_btn.pack(fill="x", padx=12, pady=6)
 
-        btn_bat_dau = tk.Button(
-            frame_btn, text="▶  Bắt Đầu",
-            bg=CLR_GREEN, fg="white",
-            font=("Segoe UI", 9, "bold"),
-            relief="flat", pady=5, cursor="hand2",
-            bd=0, command=bat_dau)
+        btn_bat_dau = tk.Button(frame_btn, text="▶  Bắt Đầu",
+                                 bg=CLR_GREEN, fg="white",
+                                 font=("Segoe UI", 9, "bold"),
+                                 relief="flat", pady=5, cursor="hand2",
+                                 bd=0, command=bat_dau)
         btn_bat_dau.pack(side="left", padx=4)
 
-        btn_chup = tk.Button(
-            frame_btn, text="📸  Chụp! (S)",
-            bg=CLR_ORANGE, fg="white",
-            font=("Segoe UI", 9, "bold"),
-            relief="flat", pady=5, cursor="hand2",
-            state="disabled", bd=0, command=chup)
+        btn_chup = tk.Button(frame_btn, text="📸  Chụp! (S)",
+                              bg=CLR_ORANGE, fg="white",
+                              font=("Segoe UI", 9, "bold"),
+                              relief="flat", pady=5, cursor="hand2",
+                              state="disabled", bd=0, command=chup)
         btn_chup.pack(side="left", padx=4)
 
-        tk.Button(
-            frame_btn, text="💾  Lưu & Đóng",
-            bg=CLR_BLUE, fg="white",
-            font=("Segoe UI", 9, "bold"),
-            relief="flat", pady=5, cursor="hand2",
-            bd=0, command=luu_dong).pack(side="left", padx=4)
+        tk.Button(frame_btn, text="💾  Lưu & Đóng",
+                  bg=CLR_BLUE, fg="white",
+                  font=("Segoe UI", 9, "bold"),
+                  relief="flat", pady=5, cursor="hand2",
+                  bd=0, command=luu_dong).pack(side="left", padx=4)
 
-        tk.Button(
-            frame_btn, text="✕  Hủy",
-            bg="#F1F3F4", fg=CLR_GRAY,
-            font=("Segoe UI", 9),
-            relief="flat", pady=5, cursor="hand2",
-            bd=0, command=huy).pack(side="left", padx=4)
+        tk.Button(frame_btn, text="✕  Hủy",
+                  bg="#F1F3F4", fg=CLR_GRAY,
+                  font=("Segoe UI", 9),
+                  relief="flat", pady=5, cursor="hand2",
+                  bd=0, command=huy).pack(side="left", padx=4)
 
         win.protocol("WM_DELETE_WINDOW", huy)
 
-    def them_ảnh_tu_may(self):
-        """Chọn ảnh từ máy tính, tự động xử lý vào known_faces"""
+    def them_anh_tu_may(self):
         from tkinter import filedialog, simpledialog
-
-        # Hỏi tên người
         ten = simpledialog.askstring(
             "Tên người",
             "Nhập tên người (không dấu, không cách):",
-            parent=self.root
-        )
+            parent=self.root)
         if not ten or not ten.strip():
             return
         ten = ten.strip().replace(" ", "_")
 
-        # Chọn nhiều ảnh
         files = filedialog.askopenfilenames(
             title=f"Chọn ảnh cho '{ten}'",
-            filetypes=[("Anh", "*.jpg *.jpeg *.png *.bmp")]
-        )
+            filetypes=[("Ảnh", "*.jpg *.jpeg *.png *.bmp")])
         if not files:
             return
 
         folder = f"known_faces/{ten}"
         os.makedirs(folder, exist_ok=True)
-
-        # Đếm ảnh cũ
         so_cu = len([f for f in os.listdir(folder)
                      if f.endswith((".jpg", ".png"))])
-
-        # Copy ảnh vào folder
         dem = 0
         for i, src in enumerate(files):
             dst = f"{folder}/{ten}_{so_cu + i + 1}.jpg"
             try:
-                img = Image.open(src).convert("RGB")
-                img.save(dst, format="JPEG", quality=95)
+                Image.open(src).convert("RGB").save(dst, format="JPEG", quality=95)
                 dem += 1
             except Exception as e:
-                self._ghi_log(f"[!] Loi copy {src}: {e}")
+                self._ghi_log(f"[!] Lỗi copy {src}: {e}")
 
         self._ghi_log(f"[OK] Đã thêm {dem} ảnh cho '{ten}'")
 
-        # Hiện popup xác nhận
         from tkinter import messagebox
         messagebox.showinfo(
             "Thêm ảnh thành công!",
-            f"Đã thêm {dem} ảnh cho '{ten}'\n"
-            f"Đang cập nhật encoding...",
-            parent=self.root
-        )
-
-        # Cập nhật encodings ngay
+            f"Đã thêm {dem} ảnh cho '{ten}'\nĐang cập nhật encoding...",
+            parent=self.root)
         self._cap_nhat_encoding_silent()
 
     def _cap_nhat_encoding_silent(self):
-        """Xử lý ảnh mới trực tiếp trong app — không dùng subprocess"""
         self._ghi_log("[~] Đang cập nhật encoding...")
 
         def _run():
@@ -634,7 +529,6 @@ class App:
                 if not os.path.exists(folder):
                     return
 
-                # Load pkl cũ
                 if os.path.exists(ENCODING_FILE):
                     with open(ENCODING_FILE, "rb") as f:
                         data = pickle.load(f)
@@ -642,28 +536,23 @@ class App:
                     known_names      = data["names"]
                     da_xu_ly         = set(data.get("da_xu_ly", []))
                 else:
-                    known_embeddings = []
-                    known_names      = []
-                    da_xu_ly         = set()
+                    known_embeddings, known_names, da_xu_ly = [], [], set()
 
-                # Chỉ xử lý ảnh MỚI
-                ảnh_moi = 0
+                anh_moi = 0
                 for ten in os.listdir(folder):
-                    duong_dan = os.path.join(folder, ten)
-                    if not os.path.isdir(duong_dan):
+                    dp = os.path.join(folder, ten)
+                    if not os.path.isdir(dp):
                         continue
-                    for file in sorted(os.listdir(duong_dan)):
+                    for file in sorted(os.listdir(dp)):
                         if not file.endswith((".jpg", ".png")):
                             continue
-                        path = os.path.join(duong_dan, file)
+                        path = os.path.join(dp, file)
                         if path in da_xu_ly:
                             continue
                         try:
-                            ảnh   = np.array(
-                                Image.open(path).convert("RGB"))
-                            faces = self.app_insight.get(ảnh)
-                            faces = [f for f in faces
-                                     if f.det_score >= NGUONG_DETECT]
+                            anh   = np.array(Image.open(path).convert("RGB"))
+                            faces = self.app_insight.get(anh)
+                            faces = [f for f in faces if f.det_score >= NGUONG_DETECT]
                             if not faces:
                                 da_xu_ly.add(path)
                                 continue
@@ -671,46 +560,35 @@ class App:
                             known_embeddings.append(face.normed_embedding)
                             known_names.append(ten)
                             da_xu_ly.add(path)
-                            ảnh_moi += 1
+                            anh_moi += 1
                         except Exception as e:
-                            print(f"Loi {file}: {e}")
+                            print(f"Lỗi {file}: {e}")
 
-                # Lưu pkl
                 with open(ENCODING_FILE, "wb") as f:
-                    pickle.dump({
-                        "embeddings": known_embeddings,
-                        "names":      known_names,
-                        "da_xu_ly":   da_xu_ly
-                    }, f)
+                    pickle.dump({"embeddings": known_embeddings,
+                                 "names": known_names,
+                                 "da_xu_ly": da_xu_ly}, f)
 
-                # Reload vào bộ nhớ app NGAY
                 self.known_embeddings = list(known_embeddings)
                 self.known_names      = list(known_names)
-
                 so_nguoi = len(set(self.known_names))
-                so_ảnh   = len(self.known_embeddings)
+                so_anh   = len(self.known_embeddings)
 
                 def _ui():
-                    self.label_db.config(text=str(so_ảnh))
+                    self.label_db.config(text=str(so_anh))
                     self.label_so_quen.config(text=str(so_nguoi))
                     self.label_trang_thai.config(
-                        text=f"Cập nhật xong!\n{so_ảnh} ảnh / {so_nguoi} nguoi",
+                        text=f"Cập nhật xong!\n{so_anh} ảnh / {so_nguoi} người",
                         bg="#E6F4EA", fg=CLR_GREEN)
                     self._ghi_log(
-                        f"[OK] Cập nhật xong: "
-                        f"+{ảnh_moi} ảnh mới | "
-                        f"Tổng: {so_ảnh} ảnh / {so_nguoi} nguoi")
+                        f"[OK] Cập nhật xong: +{anh_moi} ảnh mới | "
+                        f"Tổng: {so_anh} ảnh / {so_nguoi} người")
 
                 self.root.after(0, _ui)
-
             except Exception as e:
-                self.root.after(0,
-                    lambda: self._ghi_log(f"[LOI] {e}"))
+                self.root.after(0, lambda: self._ghi_log(f"[LOI] {e}"))
 
         threading.Thread(target=_run, daemon=True).start()
-
-    def cap_nhat_encoding(self):
-        self._cap_nhat_encoding_silent()
 
     def _cap_nhat_camera(self):
         if not self.dang_chay:
@@ -733,11 +611,9 @@ class App:
 
             for face in faces:
                 box        = face.bbox.astype(int)
-                ten, do_cx = nhan_dien(
-                    face.normed_embedding,
-                    self.known_embeddings,
-                    self.known_names
-                )
+                ten, do_cx = nhan_dien(face.normed_embedding,
+                                        self.known_embeddings,
+                                        self.known_names)
                 mau = (52, 168, 83) if ten != "NGUOI LA" else (234, 67, 53)
                 if ten == "NGUOI LA":
                     co_nguoi_la = True
@@ -749,42 +625,30 @@ class App:
             else:
                 for item in ket_qua_moi:
                     key = item[1]
-                    self.bo_dem_on_dinh[key] = \
-                        self.bo_dem_on_dinh.get(key, 0) + 1
+                    self.bo_dem_on_dinh[key] = self.bo_dem_on_dinh.get(key, 0) + 1
                 self.ket_qua_hien_tai = [
                     item for item in ket_qua_moi
-                    if self.bo_dem_on_dinh.get(item[1], 0) >= DEM_ON_DINH
-                ]
+                    if self.bo_dem_on_dinh.get(item[1], 0) >= DEM_ON_DINH]
 
             now = datetime.now().timestamp()
-            if co_nguoi_la and (now - self.thoi_gian_cảnh_bao) > CANH_BAO_MOI:
+            if co_nguoi_la and (now - self.thoi_gian_canh_bao) > CANH_BAO_MOI:
                 ten_file = luu_nguoi_la(frame, ket_qua_moi)
-                self.tong_cảnh_bao += 1
-                self.thoi_gian_cảnh_bao = now
+                self.tong_canh_bao += 1
+                self.thoi_gian_canh_bao = now
                 gio = datetime.now().strftime("%H:%M:%S")
                 self._ghi_log(f"[!!!] {gio} — NGƯỜI LẠ phát hiện! 📁 {ten_file}", "canh_bao")
-                self.label_so_la.config(text=str(self.tong_cảnh_bao))
-                # Phát âm thanh + popup cảnh báo
-                threading.Thread(
-                    target=self._canh_bao_nguoi_la,
-                    daemon=True).start()
+                self.label_so_la.config(text=str(self.tong_canh_bao))
+                threading.Thread(target=self._canh_bao_nguoi_la, daemon=True).start()
 
-            self.label_so_mat.config(
-                text=str(len(self.ket_qua_hien_tai)))
+            self.label_so_mat.config(text=str(len(self.ket_qua_hien_tai)))
 
         for (box, ten, do_cx, mau) in self.ket_qua_hien_tai:
-            cv2.rectangle(frame,
-                          (box[0], box[1]), (box[2], box[3]), mau, 2)
-            cv2.rectangle(frame,
-                          (box[0], box[3] - 32), (box[2], box[3]),
-                          mau, cv2.FILLED)
+            cv2.rectangle(frame, (box[0], box[1]), (box[2], box[3]), mau, 2)
+            cv2.rectangle(frame, (box[0], box[3] - 32), (box[2], box[3]), mau, cv2.FILLED)
             nhan = ten if ten == "NGUOI LA" else f"{ten} ({do_cx:.0f}%)"
-            cv2.putText(frame, nhan,
-                        (box[0] + 4, box[3] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.55,
-                        (255, 255, 255), 1)
+            cv2.putText(frame, nhan, (box[0] + 4, box[3] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
 
-        # Lấy đúng kích thước label camera hiện tại
         w = self.label_camera.winfo_width()
         h = self.label_camera.winfo_height()
         if w < 10 or h < 10:
@@ -795,15 +659,9 @@ class App:
         imgtk     = ImageTk.PhotoImage(image=img)
         self.label_camera.imgtk = imgtk
         self.label_camera.config(image=imgtk)
-
         self.root.after(15, self._cap_nhat_camera)
 
     def _ghi_log(self, msg, loai="info"):
-        """
-        loai: 'info' (trắng), 'canh_bao' (đỏ), 'ok' (xanh lá), 'he_thong' (xanh dương)
-        Tự động phát hiện loại từ prefix nếu không truyền vào
-        """
-        # Tự nhận loại từ prefix
         if loai == "info":
             if msg.startswith("[!!!]"):
                 loai = "canh_bao"
@@ -813,10 +671,10 @@ class App:
                 loai = "he_thong"
 
         mau = {
-            "canh_bao": "#EA4335",   # đỏ
-            "ok":       "#34A853",   # xanh lá
-            "he_thong": "#1A73E8",   # xanh dương
-            "info":     "#202124",   # đen
+            "canh_bao": "#EA4335",
+            "ok":       "#34A853",
+            "he_thong": "#1A73E8",
+            "info":     "#202124",
         }.get(loai, "#202124")
 
         tag = f"tag_{loai}"
@@ -828,50 +686,38 @@ class App:
         self.log_text.config(state="disabled")
 
     def _canh_bao_nguoi_la(self):
-        """Phát âm thanh + hiện popup cảnh báo người lạ"""
-        # Âm thanh beep hệ thống
         try:
             import winsound
-            # Beep 3 lần — tần số 1000Hz, 200ms
             for _ in range(3):
                 winsound.Beep(1000, 200)
         except:
-            pass  # Không có winsound thì bỏ qua
+            pass
 
-        # Popup cảnh báo nổi bật
         if not self._popup_dang_hien:
             self._popup_dang_hien = True
-            self._hien_popup_canh_bao()
+            self.root.after(0, self._hien_popup_canh_bao)
 
     def _hien_popup_canh_bao(self):
-        """Hiện popup cảnh báo đỏ tự động đóng sau 4 giây"""
         popup = tk.Toplevel(self.root)
         popup.title("⚠ CẢNH BÁO")
         popup.configure(bg="#EA4335")
         popup.resizable(False, False)
-        popup.attributes("-topmost", True)  # luôn ở trên cùng
+        popup.attributes("-topmost", True)
 
-        # Căn giữa màn hình
-        popup.geometry("360x160")
         sw = popup.winfo_screenwidth()
         sh = popup.winfo_screenheight()
-        popup.geometry(f"360x160+{(sw-360)//2}+{(sh-160)//2}")
+        popup.geometry(f"360x200+{(sw-360)//2}+{(sh-200)//2}")
 
         tk.Label(popup, text="⚠",
                  bg="#EA4335", fg="white",
-                 font=("Segoe UI", 36)).pack(pady=(16, 4))
-
-        tk.Label(popup,
-                 text="PHÁT HIỆN NGƯỜI LẠ!",
+                 font=("Segoe UI", 36)).pack(pady=(12, 4))
+        tk.Label(popup, text="PHÁT HIỆN NGƯỜI LẠ!",
                  bg="#EA4335", fg="white",
                  font=("Segoe UI", 14, "bold")).pack()
-
-        gio = datetime.now().strftime("%H:%M:%S")
-        tk.Label(popup, text=f"Thời gian: {gio}",
+        tk.Label(popup, text=f"Thời gian: {datetime.now().strftime('%H:%M:%S')}",
                  bg="#EA4335", fg="#FFCDD2",
                  font=("Segoe UI", 10)).pack(pady=4)
 
-        # Đếm ngược tự đóng
         label_dem = tk.Label(popup, text="Tự đóng sau 4 giây",
                               bg="#EA4335", fg="#FFCDD2",
                               font=("Segoe UI", 9))
@@ -887,65 +733,58 @@ class App:
                 return
             try:
                 label_dem.config(text=f"Tự đóng sau {n} giây")
-                popup.after(1000, lambda: dem_nguoc(n-1))
+                popup.after(1000, lambda: dem_nguoc(n - 1))
             except:
                 self._popup_dang_hien = False
 
-        # Nút đóng thủ công
         tk.Button(popup, text="✕  Đóng",
                   bg="#C62828", fg="white",
                   font=("Segoe UI", 9, "bold"),
-                  relief="flat", pady=4, cursor="hand2",
-                  bd=0,
+                  relief="flat", pady=4, cursor="hand2", bd=0,
                   command=lambda: [
                       setattr(self, '_popup_dang_hien', False),
                       popup.destroy()
-                  ]).pack(pady=4)
+                  ]).pack(pady=6)
 
         popup.after(1000, lambda: dem_nguoc(3))
 
     def quan_ly_nguoi_quen(self):
-        """Cửa sổ quản lý — xem và xóa người quen"""
         from tkinter import messagebox
 
         folder = "known_faces"
         if not os.path.exists(folder):
-            self._ghi_log("[!] Chua co người quen nao.")
+            self._ghi_log("[!] Chưa có người quen nào.")
             return
 
         nguoi_list = sorted([
             d for d in os.listdir(folder)
-            if os.path.isdir(os.path.join(folder, d))
-        ])
+            if os.path.isdir(os.path.join(folder, d))])
 
         if not nguoi_list:
-            self._ghi_log("[!] Dảnh sach người quen trong.")
+            self._ghi_log("[!] Danh sách người quen trống.")
             return
 
         win = tk.Toplevel(self.root)
-        win.title("Quan Ly Nguoi Quen")
+        win.title("Quản Lý Người Quen")
         win.configure(bg=BG_MAIN)
         win.geometry("780x520")
         win.resizable(False, False)
 
-        # Header
-        tk.Label(win,
-                 text=f"👥  Quản Lý Người Quen",
+        tk.Label(win, text="👥  Quản Lý Người Quen",
                  bg=BG_HEADER, fg="white",
                  font=("Segoe UI", 12, "bold")).pack(fill="x", ipady=8)
 
-        # Body chia 2 cột
         body = tk.Frame(win, bg=BG_MAIN)
         body.pack(fill="both", expand=True, padx=10, pady=8)
 
-        # ── Cột trái: dảnh sách ──
+        # Cột trái: danh sách
         col_trai = tk.Frame(body, bg=BG_MAIN, width=280)
         col_trai.pack(side="left", fill="y")
         col_trai.pack_propagate(False)
 
-        tk.Label(col_trai, text="Dảnh sach người quen:",
+        tk.Label(col_trai, text="Danh sách người quen:",
                  bg=BG_MAIN, fg=CLR_TEXT,
-                 font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0,4))
+                 font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(0, 4))
 
         frame_list = tk.Frame(col_trai, bg=BG_MAIN)
         frame_list.pack(fill="both", expand=True)
@@ -953,25 +792,22 @@ class App:
         scrollbar = tk.Scrollbar(frame_list)
         scrollbar.pack(side="right", fill="y")
 
-        listbox = tk.Listbox(
-            frame_list,
-            font=("Segoe UI", 11),
-            selectmode="single",
-            bg=BG_CARD, fg=CLR_TEXT,
-            selectbackground=CLR_BLUE,
-            selectforeground="white",
-            relief="flat",
-            yscrollcommand=scrollbar.set,
-            highlightthickness=1,
-            highlightbackground="#DADCE0"
-        )
+        listbox = tk.Listbox(frame_list,
+                              font=("Segoe UI", 11),
+                              selectmode="single",
+                              bg=BG_CARD, fg=CLR_TEXT,
+                              selectbackground=CLR_BLUE,
+                              selectforeground="white",
+                              relief="flat",
+                              yscrollcommand=scrollbar.set,
+                              highlightthickness=1,
+                              highlightbackground="#DADCE0")
         listbox.pack(side="left", fill="both", expand=True)
         scrollbar.config(command=listbox.yview)
 
-        # ── Cột phải: xem trước ảnh ──
+        # Cột phải: xem trước ảnh
         col_phai = tk.Frame(body, bg=BG_MAIN)
-        col_phai.pack(side="left", fill="both",
-                       expand=True, padx=(10, 0))
+        col_phai.pack(side="left", fill="both", expand=True, padx=(10, 0))
 
         tk.Label(col_phai, text="Xem trước ảnh:",
                  bg=BG_MAIN, fg=CLR_TEXT,
@@ -982,12 +818,10 @@ class App:
                                   highlightbackground="#DADCE0")
         frame_preview.pack(fill="both", expand=True)
 
-        # Canvas cuộn ảnh
-        canvas_prev = tk.Canvas(frame_preview,
-                                 bg="#F8F9FA", highlightthickness=0)
-        sb_prev = tk.Scrollbar(frame_preview, orient="vertical",
-                                command=canvas_prev.yview)
-        frame_imgs = tk.Frame(canvas_prev, bg="#F8F9FA")
+        canvas_prev = tk.Canvas(frame_preview, bg="#F8F9FA", highlightthickness=0)
+        sb_prev     = tk.Scrollbar(frame_preview, orient="vertical",
+                                    command=canvas_prev.yview)
+        frame_imgs  = tk.Frame(canvas_prev, bg="#F8F9FA")
         frame_imgs.bind("<Configure>", lambda e: canvas_prev.configure(
             scrollregion=canvas_prev.bbox("all")))
         canvas_prev.create_window((0, 0), window=frame_imgs, anchor="nw")
@@ -995,8 +829,7 @@ class App:
         canvas_prev.pack(side="left", fill="both", expand=True)
         sb_prev.pack(side="right", fill="y")
 
-        label_ten_preview = tk.Label(col_phai,
-                                      text="← Chọn tên để xem ảnh",
+        label_ten_preview = tk.Label(col_phai, text="← Chọn tên để xem ảnh",
                                       bg=BG_MAIN, fg=CLR_SUB,
                                       font=("Segoe UI", 9))
         label_ten_preview.pack(pady=4)
@@ -1006,67 +839,44 @@ class App:
         def refresh_list():
             listbox.delete(0, "end")
             ds.clear()
-            nguoi_moi = sorted([
+            ds.extend(sorted([
                 d for d in os.listdir(folder)
-                if os.path.isdir(os.path.join(folder, d))
-            ])
-            ds.extend(nguoi_moi)
+                if os.path.isdir(os.path.join(folder, d))]))
             for ten in ds:
-                so_ảnh = len([
-                    f for f in os.listdir(os.path.join(folder, ten))
-                    if f.endswith((".jpg", ".png"))
-                ])
-                listbox.insert("end", f"  👤  {ten}  ({so_ảnh} ảnh)")
+                so_anh = len([f for f in os.listdir(os.path.join(folder, ten))
+                               if f.endswith((".jpg", ".png"))])
+                listbox.insert("end", f"  👤  {ten}  ({so_anh} ảnh)")
 
         refresh_list()
 
-        def hien_ảnh_preview(ten):
-            # Xóa preview cũ
+        def hien_anh_preview(ten):
             for w in frame_imgs.winfo_children():
                 w.destroy()
-
-            ảnh_folder = os.path.join(folder, ten)
-            ảnh_files  = sorted([
-                f for f in os.listdir(ảnh_folder)
-                if f.endswith((".jpg", ".png"))
-            ])[:12]  # hiện tối đa 12 ảnh
-
-            # Grid 3 cột
-            COLS  = 3
-            THUMB = 120
-            for i, fn in enumerate(ảnh_files):
+            anh_folder = os.path.join(folder, ten)
+            anh_files  = sorted([
+                f for f in os.listdir(anh_folder)
+                if f.endswith((".jpg", ".png"))])[:12]
+            COLS, THUMB = 3, 120
+            for i, fn in enumerate(anh_files):
                 try:
-                    img   = Image.open(
-                        os.path.join(ảnh_folder, fn)
-                    ).resize((THUMB, THUMB))
+                    img   = Image.open(os.path.join(anh_folder, fn)).resize((THUMB, THUMB))
                     imgtk = ImageTk.PhotoImage(img)
-                    lbl   = tk.Label(frame_imgs, image=imgtk,
-                                      bg="#F8F9FA")
+                    lbl   = tk.Label(frame_imgs, image=imgtk, bg="#F8F9FA")
                     lbl.image = imgtk
-                    lbl.grid(row=i//COLS, column=i%COLS,
-                              padx=3, pady=3)
+                    lbl.grid(row=i // COLS, column=i % COLS, padx=3, pady=3)
                 except:
                     pass
-
-            so_ảnh = len([
-                f for f in os.listdir(ảnh_folder)
-                if f.endswith((".jpg", ".png"))
-            ])
+            so_anh = len([f for f in os.listdir(anh_folder)
+                          if f.endswith((".jpg", ".png"))])
             label_ten_preview.config(
-                text=f"👤  {ten}  —  {so_ảnh} ảnh trong DB",
+                text=f"👤  {ten}  —  {so_anh} ảnh trong DB",
                 fg=CLR_BLUE, font=("Segoe UI", 9, "bold"))
 
-        def on_select(evt):
-            sel = listbox.curselection()
-            if sel:
-                ten = ds[sel[0]]
-                hien_ảnh_preview(ten)
+        listbox.bind("<<ListboxSelect>>",
+                     lambda e: hien_anh_preview(ds[listbox.curselection()[0]])
+                     if listbox.curselection() else None)
 
-        listbox.bind("<<ListboxSelect>>", on_select)
-
-        # Thông tin chọn
-        label_chon = tk.Label(win,
-                               text="Chưa chọn ai",
+        label_chon = tk.Label(win, text="Chưa chọn ai",
                                bg=BG_MAIN, fg=CLR_SUB,
                                font=("Segoe UI", 9))
         label_chon.pack(pady=2)
@@ -1074,93 +884,70 @@ class App:
         def xoa_nguoi():
             sel = listbox.curselection()
             if not sel:
-                messagebox.showwarning(
-                    "Chưa chọn", "Hãy chọn người muốn xóa!",
-                    parent=win)
+                messagebox.showwarning("Chưa chọn", "Hãy chọn người muốn xóa!", parent=win)
                 return
-
             ten = ds[sel[0]]
-            xac_nhan = messagebox.askyesno(
+            so_anh_xoa = len([f for f in os.listdir(os.path.join(folder, ten))
+                               if f.endswith(".jpg")])
+            if not messagebox.askyesno(
                 "Xác nhận xóa",
                 f"Bạn có chắc muốn xóa '{ten}'?\n"
-                f"Tất cả {len([f for f in os.listdir(os.path.join(folder, ten)) if f.endswith('.jpg')])} "
-                f"ảnh của người này sẽ bị xóa!",
-                parent=win
-            )
-            if not xac_nhan:
+                f"Tất cả {so_anh_xoa} ảnh sẽ bị xóa!",
+                parent=win):
                 return
 
             import shutil
             shutil.rmtree(os.path.join(folder, ten))
             self._ghi_log(f"[OK] Đã xóa '{ten}' khỏi DB.")
 
-            # Xóa khỏi pkl không ảnh hưởng người khác
             if os.path.exists(ENCODING_FILE):
                 with open(ENCODING_FILE, "rb") as f:
                     data = pickle.load(f)
-                moi_emb  = []
-                moi_name = []
-                moi_daxl = set()
+                moi_emb, moi_name, moi_daxl = [], [], set()
                 for emb, name, path_xl in zip(
-                    data["embeddings"], data["names"],
-                    data.get("da_xu_ly", [])
-                ):
+                        data["embeddings"], data["names"],
+                        data.get("da_xu_ly", [])):
                     if name != ten:
                         moi_emb.append(emb)
                         moi_name.append(name)
                         moi_daxl.add(path_xl)
-
                 with open(ENCODING_FILE, "wb") as f:
-                    pickle.dump({
-                        "embeddings": moi_emb,
-                        "names":      moi_name,
-                        "da_xu_ly":   moi_daxl
-                    }, f)
-
+                    pickle.dump({"embeddings": moi_emb, "names": moi_name,
+                                 "da_xu_ly": moi_daxl}, f)
                 self.known_embeddings = list(moi_emb)
                 self.known_names      = list(moi_name)
                 so_nguoi = len(set(self.known_names))
-                so_ảnh   = len(self.known_embeddings)
-                self.label_db.config(text=str(so_ảnh))
+                so_anh   = len(self.known_embeddings)
+                self.label_db.config(text=str(so_anh))
                 self.label_so_quen.config(text=str(so_nguoi))
                 self.label_trang_thai.config(
-                    text=f"Đã xóa '{ten}'\nCòn lại: {so_ảnh} ảnh / {so_nguoi} nguoi",
+                    text=f"Đã xóa '{ten}'\nCòn lại: {so_anh} ảnh / {so_nguoi} người",
                     bg="#E6F4EA", fg=CLR_GREEN)
-                self._ghi_log(
-                    f"[OK] Còn lại: {so_ảnh} ảnh / {so_nguoi} nguoi")
+                self._ghi_log(f"[OK] Còn lại: {so_anh} ảnh / {so_nguoi} người")
 
-            # Xóa preview
             for w in frame_imgs.winfo_children():
                 w.destroy()
-            label_ten_preview.config(
-                text="Đã xóa thành công!",
-                fg=CLR_GREEN)
-            label_chon.config(
-                text=f"Đã xóa '{ten}'", fg=CLR_GREEN)
+            label_ten_preview.config(text="Đã xóa thành công!", fg=CLR_GREEN)
+            label_chon.config(text=f"Đã xóa '{ten}'", fg=CLR_GREEN)
             refresh_list()
 
-        tk.Button(win,
-                  text="🗑  Xóa Người Này",
+        tk.Button(win, text="🗑  Xóa Người Này",
                   bg=CLR_RED, fg="white",
                   font=("Segoe UI", 10, "bold"),
                   relief="flat", pady=7, cursor="hand2",
-                  bd=0, command=xoa_nguoi
-                  ).pack(fill="x", padx=10, pady=(2, 2))
+                  bd=0, command=xoa_nguoi).pack(fill="x", padx=10, pady=(2, 2))
 
-        tk.Button(win,
-                  text="✕  Đóng",
+        tk.Button(win, text="✕  Đóng",
                   bg="#F1F3F4", fg=CLR_GRAY,
                   font=("Segoe UI", 9),
                   relief="flat", pady=6, cursor="hand2",
-                  bd=0, command=win.destroy
-                  ).pack(fill="x", padx=10, pady=(0, 8))
+                  bd=0, command=win.destroy).pack(fill="x", padx=10, pady=(0, 8))
 
-    def xem_ảnh_nguoi_la(self):
+    def xem_anh_nguoi_la(self):
         folder = "unknown_log"
         if not os.path.exists(folder) or not any(
-            f.endswith(".jpg") for f in os.listdir(folder)
-        ):
-            self._ghi_log("[!] Chua co ảnh nguoi la nao.")
+                f.endswith(".jpg") for f in os.listdir(folder)):
+            self._ghi_log("[!] Chưa có ảnh người lạ nào.")
             return
 
         win = tk.Toplevel(self.root)
@@ -1169,33 +956,27 @@ class App:
         win.geometry("920x620")
         win.resizable(True, True)
 
-        # Header
-        label_header = tk.Label(win,
-                 text="📂  Kho Ảnh Người Lạ",
-                 bg=BG_HEADER, fg="white",
-                 font=("Segoe UI", 12, "bold"))
+        label_header = tk.Label(win, text="📂  Kho Ảnh Người Lạ",
+                                 bg=BG_HEADER, fg="white",
+                                 font=("Segoe UI", 12, "bold"))
         label_header.pack(fill="x", ipady=8)
 
-        # ── Bộ lọc ──
         frame_loc = tk.Frame(win, bg=BG_CARD,
-                              highlightthickness=1,
-                              highlightbackground="#DADCE0")
+                              highlightthickness=1, highlightbackground="#DADCE0")
         frame_loc.pack(fill="x", padx=10, pady=(6, 2))
 
         tk.Label(frame_loc, text="🔍  Lọc theo ngày:",
                  bg=BG_CARD, fg=CLR_TEXT,
                  font=("Segoe UI", 9, "bold")).pack(side="left", padx=8, pady=6)
 
-        # Lấy dảnh sách ngày có ảnh
-        all_files = sorted([
-            f for f in os.listdir(folder) if f.endswith(".jpg")
-        ], reverse=True)
+        all_files = sorted([f for f in os.listdir(folder)
+                             if f.endswith(".jpg")], reverse=True)
 
         ngay_list = ["Tất cả"]
         seen = set()
         for f in all_files:
             try:
-                t = datetime.strptime(f.replace(".jpg",""), "%Y%m%d_%H%M%S")
+                t = datetime.strptime(f.replace(".jpg", ""), "%Y%m%d_%H%M%S")
                 ngay = t.strftime("%d/%m/%Y")
                 if ngay not in seen:
                     ngay_list.append(ngay)
@@ -1203,110 +984,81 @@ class App:
             except:
                 pass
 
-        var_loc = tk.StringVar(value="Tất cả")
-        combo_ngay = ttk.Combobox(frame_loc,
-                                   textvariable=var_loc,
-                                   values=ngay_list,
-                                   state="readonly", width=14,
-                                   font=("Segoe UI", 9))
+        var_loc    = tk.StringVar(value="Tất cả")
+        combo_ngay = ttk.Combobox(frame_loc, textvariable=var_loc,
+                                   values=ngay_list, state="readonly",
+                                   width=14, font=("Segoe UI", 9))
         combo_ngay.pack(side="left", padx=4)
 
         label_dem = tk.Label(frame_loc, text=f"Tổng: {len(all_files)} ảnh",
-                              bg=BG_CARD, fg=CLR_SUB,
-                              font=("Segoe UI", 9))
+                              bg=BG_CARD, fg=CLR_SUB, font=("Segoe UI", 9))
         label_dem.pack(side="left", padx=12)
 
-        # Trạng thái chọn ảnh
-        ảnh_da_chon = set()
+        anh_da_chon     = set()
         label_chon_info = tk.Label(frame_loc,
-                                    text="Nhan vao ảnh de chon xoa",
+                                    text="Nhấn vào ảnh để chọn xóa",
                                     bg=BG_CARD, fg=CLR_SUB,
                                     font=("Segoe UI", 9))
         label_chon_info.pack(side="left", padx=8)
 
-        # ── Gallery ──
         frame_outer = tk.Frame(win, bg=BG_MAIN)
         frame_outer.pack(fill="both", expand=True, padx=10, pady=4)
 
         canvas    = tk.Canvas(frame_outer, bg=BG_MAIN, highlightthickness=0)
-        scrollbar = tk.Scrollbar(frame_outer, orient="vertical",
-                                  command=canvas.yview)
+        scrollbar = tk.Scrollbar(frame_outer, orient="vertical", command=canvas.yview)
         frame_grid = tk.Frame(canvas, bg=BG_MAIN)
-
         frame_grid.bind("<Configure>", lambda e: canvas.configure(
             scrollregion=canvas.bbox("all")))
         canvas.create_window((0, 0), window=frame_grid, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-
-        # Scroll bằng chuột
         canvas.bind_all("<MouseWheel>",
-                         lambda e: canvas.yview_scroll(
-                             int(-1*(e.delta/120)), "units"))
+                         lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
-        COLS   = 4
-        THUMB  = 190
-
-        card_widgets = {}  # filename -> (card_frame, border_color)
+        COLS, THUMB = 4, 190
+        card_widgets = {}
 
         def toggle_chon(filename, card):
-            if filename in ảnh_da_chon:
-                ảnh_da_chon.remove(filename)
-                card.config(highlightbackground="#DADCE0",
-                             highlightthickness=1)
+            if filename in anh_da_chon:
+                anh_da_chon.remove(filename)
+                card.config(highlightbackground="#DADCE0", highlightthickness=1)
             else:
-                ảnh_da_chon.add(filename)
-                card.config(highlightbackground=CLR_RED,
-                             highlightthickness=3)
-            n = len(ảnh_da_chon)
-            if n > 0:
-                label_chon_info.config(
-                    text=f"Đã chọn {n} ảnh",
-                    fg=CLR_RED)
-            else:
-                label_chon_info.config(
-                    text="Nhan vao ảnh de chon xoa",
-                    fg=CLR_SUB)
+                anh_da_chon.add(filename)
+                card.config(highlightbackground=CLR_RED, highlightthickness=3)
+            n = len(anh_da_chon)
+            label_chon_info.config(
+                text=f"Đã chọn {n} ảnh" if n > 0 else "Nhấn vào ảnh để chọn xóa",
+                fg=CLR_RED if n > 0 else CLR_SUB)
 
-        def hien_ảnh(files_hien):
-            # Xóa grid cũ
+        def hien_anh(files_hien):
             for w in frame_grid.winfo_children():
                 w.destroy()
             card_widgets.clear()
-            ảnh_da_chon.clear()
-            label_chon_info.config(
-                text="Nhan vao ảnh de chon xoa", fg=CLR_SUB)
-
+            anh_da_chon.clear()
+            label_chon_info.config(text="Nhấn vào ảnh để chọn xóa", fg=CLR_SUB)
             label_dem.config(text=f"Tổng: {len(files_hien)} ảnh")
-            label_header.config(
-                text=f"📂  Kho Ảnh Người Lạ  —  {len(files_hien)} ảnh")
+            label_header.config(text=f"📂  Kho Ảnh Người Lạ  —  {len(files_hien)} ảnh")
 
             for i, filename in enumerate(files_hien):
                 path = os.path.join(folder, filename)
                 try:
                     img   = Image.open(path).resize((THUMB, THUMB))
                     imgtk = ImageTk.PhotoImage(img)
-
-                    row = i // COLS
-                    col = i % COLS
+                    row, col = i // COLS, i % COLS
 
                     card = tk.Frame(frame_grid, bg=BG_CARD,
                                     highlightthickness=1,
                                     highlightbackground="#DADCE0",
                                     cursor="hand2")
-                    card.grid(row=row, column=col,
-                              padx=5, pady=5, sticky="nsew")
+                    card.grid(row=row, column=col, padx=5, pady=5, sticky="nsew")
 
-                    lbl_img = tk.Label(card, image=imgtk,
-                                        bg=BG_CARD, cursor="hand2")
+                    lbl_img = tk.Label(card, image=imgtk, bg=BG_CARD, cursor="hand2")
                     lbl_img.image = imgtk
                     lbl_img.pack()
 
-                    # Timestamp
                     try:
-                        t = datetime.strptime(
-                            filename.replace(".jpg",""), "%Y%m%d_%H%M%S")
+                        t  = datetime.strptime(filename.replace(".jpg",""), "%Y%m%d_%H%M%S")
                         ts = t.strftime("%d/%m/%Y  %H:%M:%S")
                     except:
                         ts = filename
@@ -1315,107 +1067,81 @@ class App:
                     frame_ts.pack(fill="x")
                     tk.Label(frame_ts, text=f"🕐  {ts}",
                              bg="#EA4335", fg="white",
-                             font=("Segoe UI", 9, "bold"),
-                             pady=3).pack()
+                             font=("Segoe UI", 9, "bold"), pady=3).pack()
 
-                    # Nhấn để chọn/bỏ chọn
                     fn = filename
-                    card.bind("<Button-1>",
-                               lambda e, f=fn, c=card: toggle_chon(f, c))
-                    lbl_img.bind("<Button-1>",
-                                  lambda e, f=fn, c=card: toggle_chon(f, c))
-
+                    card.bind("<Button-1>",   lambda e, f=fn, c=card: toggle_chon(f, c))
+                    lbl_img.bind("<Button-1>", lambda e, f=fn, c=card: toggle_chon(f, c))
                     card_widgets[filename] = card
-
                 except Exception as e:
-                    print(f"Loi {filename}: {e}")
+                    print(f"Lỗi {filename}: {e}")
 
-        def loc_ảnh(*args):
+        def loc_anh(*args):
             ngay = var_loc.get()
             if ngay == "Tất cả":
-                hien_ảnh(all_files)
+                hien_anh(all_files)
             else:
-                loc = [f for f in all_files if
-                       datetime.strptime(
-                           f.replace(".jpg",""), "%Y%m%d_%H%M%S"
-                       ).strftime("%d/%m/%Y") == ngay]
-                hien_ảnh(loc)
+                hien_anh([f for f in all_files if
+                           datetime.strptime(f.replace(".jpg",""), "%Y%m%d_%H%M%S"
+                                             ).strftime("%d/%m/%Y") == ngay])
 
-        combo_ngay.bind("<<ComboboxSelected>>", loc_ảnh)
-        hien_ảnh(all_files)
+        combo_ngay.bind("<<ComboboxSelected>>", loc_anh)
+        hien_anh(all_files)
 
-        # ── Nút dưới ──
         frame_bottom = tk.Frame(win, bg=BG_MAIN)
         frame_bottom.pack(fill="x", padx=10, pady=(4, 8))
 
         def xoa_da_chon():
-            if not ảnh_da_chon:
+            if not anh_da_chon:
                 from tkinter import messagebox
-                messagebox.showwarning(
-                    "Chưa chọn", "Nhan vao ảnh muon xoa truoc!",
-                    parent=win)
+                messagebox.showwarning("Chưa chọn",
+                                        "Nhấn vào ảnh muốn xóa trước!", parent=win)
                 return
             from tkinter import messagebox
-            ok = messagebox.askyesno(
-                "Xác nhận",
-                f"Xóa {len(ảnh_da_chon)} ảnh da chon?",
-                parent=win)
-            if not ok:
+            if not messagebox.askyesno("Xác nhận",
+                                        f"Xóa {len(anh_da_chon)} ảnh đã chọn?",
+                                        parent=win):
                 return
-            for fn in list(ảnh_da_chon):
+            for fn in list(anh_da_chon):
                 try:
                     os.remove(os.path.join(folder, fn))
                     all_files.remove(fn)
                 except:
                     pass
-            self._ghi_log(f"[OK] Đã xóa {len(ảnh_da_chon)} ảnh nguoi la.")
-            self.tong_cảnh_bao = max(0, self.tong_cảnh_bao - len(ảnh_da_chon))
-            self.label_so_la.config(text=str(self.tong_cảnh_bao))
-            loc_ảnh()
+            self._ghi_log(f"[OK] Đã xóa {len(anh_da_chon)} ảnh người lạ.")
+            self.tong_canh_bao = max(0, self.tong_canh_bao - len(anh_da_chon))
+            self.label_so_la.config(text=str(self.tong_canh_bao))
+            loc_anh()
 
-        tk.Button(frame_bottom,
-                  text="🗑  Xóa Ảnh Đã Chọn",
-                  bg=CLR_RED, fg="white",
-                  font=("Segoe UI", 10, "bold"),
+        tk.Button(frame_bottom, text="🗑  Xóa Ảnh Đã Chọn",
+                  bg=CLR_RED, fg="white", font=("Segoe UI", 10, "bold"),
                   relief="flat", pady=7, cursor="hand2", bd=0,
-                  command=xoa_da_chon
-                  ).pack(side="left", padx=4)
+                  command=xoa_da_chon).pack(side="left", padx=4)
 
-        tk.Button(frame_bottom,
-                  text="☑  Chọn Tất Cả",
-                  bg="#37474F", fg="white",
-                  font=("Segoe UI", 9, "bold"),
+        tk.Button(frame_bottom, text="☑  Chọn Tất Cả",
+                  bg="#37474F", fg="white", font=("Segoe UI", 9, "bold"),
                   relief="flat", pady=7, cursor="hand2", bd=0,
                   command=lambda: [
-                      ảnh_da_chon.update(
-                          card_widgets.keys()),
-                      [c.config(highlightbackground=CLR_RED,
-                                highlightthickness=3)
+                      anh_da_chon.update(card_widgets.keys()),
+                      [c.config(highlightbackground=CLR_RED, highlightthickness=3)
                        for c in card_widgets.values()],
                       label_chon_info.config(
-                          text=f"Đã chọn {len(ảnh_da_chon)} ảnh",
-                          fg=CLR_RED)
+                          text=f"Đã chọn {len(anh_da_chon)} ảnh", fg=CLR_RED)
                   ]).pack(side="left", padx=4)
 
-        tk.Button(frame_bottom,
-                  text="✕  Bỏ Chọn Tất Cả",
-                  bg="#F1F3F4", fg=CLR_GRAY,
-                  font=("Segoe UI", 9),
+        tk.Button(frame_bottom, text="✕  Bỏ Chọn Tất Cả",
+                  bg="#F1F3F4", fg=CLR_GRAY, font=("Segoe UI", 9),
                   relief="flat", pady=7, cursor="hand2", bd=0,
                   command=lambda: [
-                      ảnh_da_chon.clear(),
-                      [c.config(highlightbackground="#DADCE0",
-                                highlightthickness=1)
+                      anh_da_chon.clear(),
+                      [c.config(highlightbackground="#DADCE0", highlightthickness=1)
                        for c in card_widgets.values()],
                       label_chon_info.config(
-                          text="Nhan vao ảnh de chon xoa",
-                          fg=CLR_SUB)
+                          text="Nhấn vào ảnh để chọn xóa", fg=CLR_SUB)
                   ]).pack(side="left", padx=4)
 
-        tk.Button(frame_bottom,
-                  text="🗑  Xóa Tất Cả",
-                  bg="#B71C1C", fg="white",
-                  font=("Segoe UI", 9),
+        tk.Button(frame_bottom, text="🗑  Xóa Tất Cả",
+                  bg="#B71C1C", fg="white", font=("Segoe UI", 9),
                   relief="flat", pady=7, cursor="hand2", bd=0,
                   command=lambda: self._xoa_tat_ca_nguoi_la(win)
                   ).pack(side="right", padx=4)
@@ -1427,36 +1153,30 @@ class App:
         files = [f for f in os.listdir(folder) if f.endswith(".jpg")]
         for f in files:
             os.remove(os.path.join(folder, f))
-        self.tong_cảnh_bao = 0
+        self.tong_canh_bao = 0
         self.label_so_la.config(text="0")
-        self._ghi_log(f"[OK] Đã xóa {len(files)} ảnh nguoi la.")
+        self._ghi_log(f"[OK] Đã xóa {len(files)} ảnh người lạ.")
         win.destroy()
 
     def xuat_log(self):
-        """Xuất toàn bộ log ra file .txt"""
         from tkinter import filedialog
         noi_dung = self.log_text.get("1.0", "end").strip()
         if not noi_dung:
             self._ghi_log("[!] Log đang trống, không có gì để xuất.")
             return
-
         ten_mac_dinh = f"log_canh_bao_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         duong_dan = filedialog.asksaveasfilename(
-            title="Lưu file log",
-            defaultextension=".txt",
+            title="Lưu file log", defaultextension=".txt",
             initialfile=ten_mac_dinh,
-            filetypes=[("Text file", "*.txt"), ("All files", "*.*")]
-        )
+            filetypes=[("Text file", "*.txt"), ("All files", "*.*")])
         if not duong_dan:
             return
-
         with open(duong_dan, "w", encoding="utf-8") as f:
             f.write("=" * 50 + "\n")
             f.write("  HỆ THỐNG NHẬN DIỆN NGƯỜI LẠ\n")
             f.write(f"  Xuất lúc: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
             f.write("=" * 50 + "\n\n")
             f.write(noi_dung)
-
         self._ghi_log(f"[OK] Đã xuất log ra: {os.path.basename(duong_dan)}", "ok")
 
     def xoa_log(self):
@@ -1465,56 +1185,45 @@ class App:
         self.log_text.config(state="disabled")
 
     def ve_chung_toi(self):
-        """Cửa sổ thông tin nhóm"""
         win = tk.Toplevel(self.root)
         win.title("Về Chúng Tôi")
         win.configure(bg=BG_MAIN)
-        win.geometry("420x380")
         win.resizable(False, False)
         win.attributes("-topmost", True)
 
-        # Căn giữa
-        sw = win.winfo_screenwidth()
-        sh = win.winfo_screenheight()
-        win.geometry(f"420x380+{(sw-420)//2}+{(sh-380)//2}")
+        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
+        win.geometry(f"420x400+{(sw-420)//2}+{(sh-400)//2}")
 
-        # Header
         tk.Label(win, text="ℹ  Về Chúng Tôi",
                  bg=BG_HEADER, fg="white",
                  font=("Segoe UI", 12, "bold")).pack(fill="x", ipady=10)
 
-        # Nội dung — nhóm tự điền thông tin vào đây
         card = self._card(win)
         card.pack(fill="both", expand=True, padx=16, pady=12)
 
         info = [
-            ("📚  Môn học",    "Thị Giác Máy Tính"),
-            ("🏫  Trường",     "Trường Đại Học Vinh"),
-            ("👨‍🏫  Giáo viên", "Nguyễn Thị Minh Tâm"),
-            ("📌  Đề tài",     "Hệ thống phát hiện và\ncảnh báo người lạ vào nhà"),
-            ("👥  Nhóm",       "Nhóm 6"),
+            ("📚  Môn học",     "Thị Giác Máy Tính"),
+            ("🏫  Trường",      "Trường Đại Học Vinh"),
+            ("👩‍🏫  Giáo viên",  "Nguyễn Thị Minh Tâm"),
+            ("📌  Đề tài",      "Hệ thống phát hiện và\ncảnh báo người lạ vào nhà"),
+            ("👥  Nhóm",        "Nhóm 6"),
         ]
 
         thanh_vien = [
-            ("Thành viên 1", "Nguyễn Khánh Duy"),
-            ("Thành viên 2", "Nguyễn Trọng Mạnh"),
-            ("Thành viên 3", "Hoàng Minh Thắng"),
+            ("Nguyễn Khánh Duy",  "MSSV: ..."),
+            ("Nguyễn Trọng Mạnh", "MSSV: ..."),
+            ("Hoàng Minh Thắng",  "MSSV: ..."),
         ]
 
         for nhan, gia_tri in info:
             f = tk.Frame(card, bg=BG_CARD)
             f.pack(fill="x", padx=12, pady=3)
-            tk.Label(f, text=nhan,
-                     bg=BG_CARD, fg=CLR_SUB,
-                     font=("Segoe UI", 9),
-                     width=14, anchor="w").pack(side="left")
-            tk.Label(f, text=gia_tri,
-                     bg=BG_CARD, fg=CLR_TEXT,
-                     font=("Segoe UI", 9, "bold"),
-                     justify="left").pack(side="left")
+            tk.Label(f, text=nhan, bg=BG_CARD, fg=CLR_SUB,
+                     font=("Segoe UI", 9), width=14, anchor="w").pack(side="left")
+            tk.Label(f, text=gia_tri, bg=BG_CARD, fg=CLR_TEXT,
+                     font=("Segoe UI", 9, "bold"), justify="left").pack(side="left")
 
-        tk.Frame(card, bg="#DADCE0", height=1).pack(
-            fill="x", padx=12, pady=6)
+        tk.Frame(card, bg="#DADCE0", height=1).pack(fill="x", padx=12, pady=6)
 
         tk.Label(card, text="👨‍💻  Thành viên nhóm",
                  bg=BG_CARD, fg=CLR_TEXT,
@@ -1523,31 +1232,24 @@ class App:
         for ten, mssv in thanh_vien:
             f = tk.Frame(card, bg=BG_CARD)
             f.pack(fill="x", padx=12, pady=2)
-            tk.Label(f, text=f"  • {ten}",
-                     bg=BG_CARD, fg=CLR_TEXT,
+            tk.Label(f, text=f"  • {ten}", bg=BG_CARD, fg=CLR_TEXT,
                      font=("Segoe UI", 9)).pack(side="left")
-            tk.Label(f, text=mssv,
-                     bg=BG_CARD, fg=CLR_SUB,
+            tk.Label(f, text=mssv, bg=BG_CARD, fg=CLR_SUB,
                      font=("Segoe UI", 9)).pack(side="left", padx=8)
 
-        tk.Label(card,
-                 text="🛠  Công nghệ: InsightFace + ArcFace + OpenCV",
+        tk.Label(card, text="🛠  Công nghệ: InsightFace + ArcFace + OpenCV",
                  bg=BG_CARD, fg=CLR_SUB,
-                 font=("Segoe UI", 8)).pack(anchor="w", padx=12, pady=(8,4))
+                 font=("Segoe UI", 8)).pack(anchor="w", padx=12, pady=(8, 4))
 
         tk.Button(win, text="✕  Đóng",
                   bg=CLR_BLUE, fg="white",
                   font=("Segoe UI", 11, "bold"),
                   relief="flat", pady=10, cursor="hand2",
                   bd=0, command=win.destroy
-                  ).pack(fill="x", padx=16, pady=(4, 16))
-        self.log_text.config(state="normal")
-        self.log_text.delete("1.0", "end")
-        self.log_text.config(state="disabled")
+                  ).pack(fill="x", padx=16, pady=(0, 16))
 
     def _cap_nhat_gio(self):
-        gio = datetime.now().strftime("%H:%M:%S  |  %d/%m/%Y")
-        self.label_gio.config(text=gio)
+        self.label_gio.config(text=datetime.now().strftime("%H:%M:%S  |  %d/%m/%Y"))
         self.root.after(1000, self._cap_nhat_gio)
 
     def dong_app(self):
@@ -1555,6 +1257,7 @@ class App:
         if self.cap:
             self.cap.release()
         self.root.destroy()
+
 
 if __name__ == "__main__":
     root = tk.Tk()
