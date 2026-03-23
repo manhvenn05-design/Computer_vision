@@ -11,7 +11,7 @@ from insightface.app import FaceAnalysis
 
 # ── Cấu hình ─────────────────────────────────────────
 ENCODING_FILE = "encodings.pkl"
-NGUONG_COSINE = 0.5
+NGUONG_COSINE = 0.45
 NGUONG_DETECT = 0.5
 DEM_ON_DINH   = 2
 DETECT_MOI    = 3
@@ -250,7 +250,7 @@ class App:
         self.btn_dung.pack(fill="x", pady=2)
 
         tk.Button(
-            frame_btn, text="📷  Thêm người quen trực tiếp",
+            frame_btn, text="📷  Chụp Ảnh Người Quen",
             bg=CLR_BLUE, fg="white",
             font=("Segoe UI", 9, "bold"),
             relief="flat", pady=6, cursor="hand2",
@@ -259,7 +259,7 @@ class App:
         ).pack(fill="x", pady=2)
 
         tk.Button(
-            frame_btn, text="🖼  Thêm ảnh Từ máy",
+            frame_btn, text="🖼  Thêm Ảnh Từ Máy",
             bg="#7B1FA2", fg="white",
             font=("Segoe UI", 9, "bold"),
             relief="flat", pady=6, cursor="hand2",
@@ -286,6 +286,15 @@ class App:
         ).pack(fill="x", pady=2)
 
         tk.Button(
+            frame_btn, text="📤  Xuất Log Ra File",
+            bg="#00897B", fg="white",
+            font=("Segoe UI", 9, "bold"),
+            relief="flat", pady=6, cursor="hand2",
+            bd=0, activebackground="#00695C",
+            command=self.xuat_log
+        ).pack(fill="x", pady=2)
+
+        tk.Button(
             frame_btn, text="🗑  Xóa Log",
             bg="#F1F3F4", fg=CLR_GRAY,
             font=("Segoe UI", 9),
@@ -293,6 +302,15 @@ class App:
             bd=0,
             command=self.xoa_log
         ).pack(fill="x", pady=2)
+
+        tk.Button(
+            frame_btn, text="ℹ  Về Chúng Tôi",
+            bg="#F1F3F4", fg=CLR_GRAY,
+            font=("Segoe UI", 9),
+            relief="flat", pady=6, cursor="hand2",
+            bd=0,
+            command=self.ve_chung_toi
+        ).pack(fill="x", pady=(8, 2))
 
         # Card log
         card_log = self._card(col_phai)
@@ -347,7 +365,16 @@ class App:
 
     def bat_dau(self):
         if not self.known_embeddings:
-            self._ghi_log("[!] Chua co encoding!")
+            from tkinter import messagebox
+            messagebox.showwarning(
+                "Chưa có dữ liệu",
+                "Chưa có khuôn mặt nào trong DB!\n\n"
+                "Hãy thêm người quen trước bằng cách:\n"
+                "• Nhấn '📷 Chụp Ảnh Người Quen'\n"
+                "• Hoặc '🖼 Thêm Ảnh Từ Máy'",
+                parent=self.root
+            )
+            self._ghi_log("[!] Chưa có dữ liệu — hãy thêm người quen trước!")
             return
 
         self.cap = cv2.VideoCapture(0)
@@ -735,7 +762,7 @@ class App:
                 self.tong_cảnh_bao += 1
                 self.thoi_gian_cảnh_bao = now
                 gio = datetime.now().strftime("%H:%M:%S")
-                self._ghi_log(f"[!!!] {gio} — NGƯỜI LẠ phát hiện!", "canh_bao")
+                self._ghi_log(f"[!!!] {gio} — NGƯỜI LẠ phát hiện! 📁 {ten_file}", "canh_bao")
                 self.label_so_la.config(text=str(self.tong_cảnh_bao))
                 # Phát âm thanh + popup cảnh báo
                 threading.Thread(
@@ -1405,7 +1432,115 @@ class App:
         self._ghi_log(f"[OK] Đã xóa {len(files)} ảnh nguoi la.")
         win.destroy()
 
+    def xuat_log(self):
+        """Xuất toàn bộ log ra file .txt"""
+        from tkinter import filedialog
+        noi_dung = self.log_text.get("1.0", "end").strip()
+        if not noi_dung:
+            self._ghi_log("[!] Log đang trống, không có gì để xuất.")
+            return
+
+        ten_mac_dinh = f"log_canh_bao_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        duong_dan = filedialog.asksaveasfilename(
+            title="Lưu file log",
+            defaultextension=".txt",
+            initialfile=ten_mac_dinh,
+            filetypes=[("Text file", "*.txt"), ("All files", "*.*")]
+        )
+        if not duong_dan:
+            return
+
+        with open(duong_dan, "w", encoding="utf-8") as f:
+            f.write("=" * 50 + "\n")
+            f.write("  HỆ THỐNG NHẬN DIỆN NGƯỜI LẠ\n")
+            f.write(f"  Xuất lúc: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
+            f.write("=" * 50 + "\n\n")
+            f.write(noi_dung)
+
+        self._ghi_log(f"[OK] Đã xuất log ra: {os.path.basename(duong_dan)}", "ok")
+
     def xoa_log(self):
+        self.log_text.config(state="normal")
+        self.log_text.delete("1.0", "end")
+        self.log_text.config(state="disabled")
+
+    def ve_chung_toi(self):
+        """Cửa sổ thông tin nhóm"""
+        win = tk.Toplevel(self.root)
+        win.title("Về Chúng Tôi")
+        win.configure(bg=BG_MAIN)
+        win.geometry("420x380")
+        win.resizable(False, False)
+        win.attributes("-topmost", True)
+
+        # Căn giữa
+        sw = win.winfo_screenwidth()
+        sh = win.winfo_screenheight()
+        win.geometry(f"420x380+{(sw-420)//2}+{(sh-380)//2}")
+
+        # Header
+        tk.Label(win, text="ℹ  Về Chúng Tôi",
+                 bg=BG_HEADER, fg="white",
+                 font=("Segoe UI", 12, "bold")).pack(fill="x", ipady=10)
+
+        # Nội dung — nhóm tự điền thông tin vào đây
+        card = self._card(win)
+        card.pack(fill="both", expand=True, padx=16, pady=12)
+
+        info = [
+            ("📚  Môn học",    "Thị Giác Máy Tính"),
+            ("🏫  Trường",     "Trường Đại Học Vinh"),
+            ("👨‍🏫  Giáo viên", "Nguyễn Thị Minh Tâm"),
+            ("📌  Đề tài",     "Hệ thống phát hiện và\ncảnh báo người lạ vào nhà"),
+            ("👥  Nhóm",       "Nhóm 6"),
+        ]
+
+        thanh_vien = [
+            ("Thành viên 1", "Nguyễn Khánh Duy"),
+            ("Thành viên 2", "Nguyễn Trọng Mạnh"),
+            ("Thành viên 3", "Hoàng Minh Thắng"),
+        ]
+
+        for nhan, gia_tri in info:
+            f = tk.Frame(card, bg=BG_CARD)
+            f.pack(fill="x", padx=12, pady=3)
+            tk.Label(f, text=nhan,
+                     bg=BG_CARD, fg=CLR_SUB,
+                     font=("Segoe UI", 9),
+                     width=14, anchor="w").pack(side="left")
+            tk.Label(f, text=gia_tri,
+                     bg=BG_CARD, fg=CLR_TEXT,
+                     font=("Segoe UI", 9, "bold"),
+                     justify="left").pack(side="left")
+
+        tk.Frame(card, bg="#DADCE0", height=1).pack(
+            fill="x", padx=12, pady=6)
+
+        tk.Label(card, text="👨‍💻  Thành viên nhóm",
+                 bg=BG_CARD, fg=CLR_TEXT,
+                 font=("Segoe UI", 9, "bold")).pack(anchor="w", padx=12)
+
+        for ten, mssv in thanh_vien:
+            f = tk.Frame(card, bg=BG_CARD)
+            f.pack(fill="x", padx=12, pady=2)
+            tk.Label(f, text=f"  • {ten}",
+                     bg=BG_CARD, fg=CLR_TEXT,
+                     font=("Segoe UI", 9)).pack(side="left")
+            tk.Label(f, text=mssv,
+                     bg=BG_CARD, fg=CLR_SUB,
+                     font=("Segoe UI", 9)).pack(side="left", padx=8)
+
+        tk.Label(card,
+                 text="🛠  Công nghệ: InsightFace + ArcFace + OpenCV",
+                 bg=BG_CARD, fg=CLR_SUB,
+                 font=("Segoe UI", 8)).pack(anchor="w", padx=12, pady=(8,4))
+
+        tk.Button(win, text="✕  Đóng",
+                  bg=CLR_BLUE, fg="white",
+                  font=("Segoe UI", 11, "bold"),
+                  relief="flat", pady=10, cursor="hand2",
+                  bd=0, command=win.destroy
+                  ).pack(fill="x", padx=16, pady=(4, 16))
         self.log_text.config(state="normal")
         self.log_text.delete("1.0", "end")
         self.log_text.config(state="disabled")
