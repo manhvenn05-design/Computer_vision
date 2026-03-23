@@ -105,6 +105,7 @@ class App:
         self.app_insight        = None
         self.known_embeddings   = []
         self.known_names        = []
+        self._popup_dang_hien   = False
 
         self._build_ui()
         self._load_model_thread()
@@ -249,7 +250,7 @@ class App:
         self.btn_dung.pack(fill="x", pady=2)
 
         tk.Button(
-            frame_btn, text="📷  Chụp Ảnh Người Quen",
+            frame_btn, text="📷  Thêm người quen trực tiếp",
             bg=CLR_BLUE, fg="white",
             font=("Segoe UI", 9, "bold"),
             relief="flat", pady=6, cursor="hand2",
@@ -258,7 +259,7 @@ class App:
         ).pack(fill="x", pady=2)
 
         tk.Button(
-            frame_btn, text="🖼  Thêm Ảnh Từ Máy",
+            frame_btn, text="🖼  Thêm ảnh Từ máy",
             bg="#7B1FA2", fg="white",
             font=("Segoe UI", 9, "bold"),
             relief="flat", pady=6, cursor="hand2",
@@ -734,8 +735,12 @@ class App:
                 self.tong_cảnh_bao += 1
                 self.thoi_gian_cảnh_bao = now
                 gio = datetime.now().strftime("%H:%M:%S")
-                self._ghi_log(f"[!!!] {gio} — NGƯỜI LẠ phát hiện!")
+                self._ghi_log(f"[!!!] {gio} — NGƯỜI LẠ phát hiện!", "canh_bao")
                 self.label_so_la.config(text=str(self.tong_cảnh_bao))
+                # Phát âm thanh + popup cảnh báo
+                threading.Thread(
+                    target=self._canh_bao_nguoi_la,
+                    daemon=True).start()
 
             self.label_so_mat.config(
                 text=str(len(self.ket_qua_hien_tai)))
@@ -766,12 +771,111 @@ class App:
 
         self.root.after(15, self._cap_nhat_camera)
 
-    def _ghi_log(self, msg):
+    def _ghi_log(self, msg, loai="info"):
+        """
+        loai: 'info' (trắng), 'canh_bao' (đỏ), 'ok' (xanh lá), 'he_thong' (xanh dương)
+        Tự động phát hiện loại từ prefix nếu không truyền vào
+        """
+        # Tự nhận loại từ prefix
+        if loai == "info":
+            if msg.startswith("[!!!]"):
+                loai = "canh_bao"
+            elif msg.startswith("[OK]") or msg.startswith("[>>]"):
+                loai = "ok"
+            elif msg.startswith("[~]") or msg.startswith("[■]"):
+                loai = "he_thong"
+
+        mau = {
+            "canh_bao": "#EA4335",   # đỏ
+            "ok":       "#34A853",   # xanh lá
+            "he_thong": "#1A73E8",   # xanh dương
+            "info":     "#202124",   # đen
+        }.get(loai, "#202124")
+
+        tag = f"tag_{loai}"
         self.log_text.config(state="normal")
         gio = datetime.now().strftime("%H:%M:%S")
-        self.log_text.insert("end", f"{gio}  {msg}\n")
+        self.log_text.tag_config(tag, foreground=mau)
+        self.log_text.insert("end", f"{gio}  {msg}\n", tag)
         self.log_text.see("end")
         self.log_text.config(state="disabled")
+
+    def _canh_bao_nguoi_la(self):
+        """Phát âm thanh + hiện popup cảnh báo người lạ"""
+        # Âm thanh beep hệ thống
+        try:
+            import winsound
+            # Beep 3 lần — tần số 1000Hz, 200ms
+            for _ in range(3):
+                winsound.Beep(1000, 200)
+        except:
+            pass  # Không có winsound thì bỏ qua
+
+        # Popup cảnh báo nổi bật
+        if not self._popup_dang_hien:
+            self._popup_dang_hien = True
+            self._hien_popup_canh_bao()
+
+    def _hien_popup_canh_bao(self):
+        """Hiện popup cảnh báo đỏ tự động đóng sau 4 giây"""
+        popup = tk.Toplevel(self.root)
+        popup.title("⚠ CẢNH BÁO")
+        popup.configure(bg="#EA4335")
+        popup.resizable(False, False)
+        popup.attributes("-topmost", True)  # luôn ở trên cùng
+
+        # Căn giữa màn hình
+        popup.geometry("360x160")
+        sw = popup.winfo_screenwidth()
+        sh = popup.winfo_screenheight()
+        popup.geometry(f"360x160+{(sw-360)//2}+{(sh-160)//2}")
+
+        tk.Label(popup, text="⚠",
+                 bg="#EA4335", fg="white",
+                 font=("Segoe UI", 36)).pack(pady=(16, 4))
+
+        tk.Label(popup,
+                 text="PHÁT HIỆN NGƯỜI LẠ!",
+                 bg="#EA4335", fg="white",
+                 font=("Segoe UI", 14, "bold")).pack()
+
+        gio = datetime.now().strftime("%H:%M:%S")
+        tk.Label(popup, text=f"Thời gian: {gio}",
+                 bg="#EA4335", fg="#FFCDD2",
+                 font=("Segoe UI", 10)).pack(pady=4)
+
+        # Đếm ngược tự đóng
+        label_dem = tk.Label(popup, text="Tự đóng sau 4 giây",
+                              bg="#EA4335", fg="#FFCDD2",
+                              font=("Segoe UI", 9))
+        label_dem.pack()
+
+        def dem_nguoc(n):
+            if n <= 0:
+                self._popup_dang_hien = False
+                try:
+                    popup.destroy()
+                except:
+                    pass
+                return
+            try:
+                label_dem.config(text=f"Tự đóng sau {n} giây")
+                popup.after(1000, lambda: dem_nguoc(n-1))
+            except:
+                self._popup_dang_hien = False
+
+        # Nút đóng thủ công
+        tk.Button(popup, text="✕  Đóng",
+                  bg="#C62828", fg="white",
+                  font=("Segoe UI", 9, "bold"),
+                  relief="flat", pady=4, cursor="hand2",
+                  bd=0,
+                  command=lambda: [
+                      setattr(self, '_popup_dang_hien', False),
+                      popup.destroy()
+                  ]).pack(pady=4)
+
+        popup.after(1000, lambda: dem_nguoc(3))
 
     def quan_ly_nguoi_quen(self):
         """Cửa sổ quản lý — xem và xóa người quen"""
