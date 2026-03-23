@@ -1,6 +1,6 @@
 import cv2
 import tkinter as tk
-from tkinter import scrolledtext, font
+from tkinter import ttk, scrolledtext, font
 import threading
 import numpy as np
 from datetime import datetime
@@ -267,6 +267,15 @@ class App:
         ).pack(fill="x", pady=2)
 
         tk.Button(
+            frame_btn, text="👥  Quan Ly Nguoi Quen",
+            bg="#37474F", fg="white",
+            font=("Arial", 9, "bold"),
+            relief="flat", pady=6, cursor="hand2",
+            bd=0, activebackground="#263238",
+            command=self.quan_ly_nguoi_quen
+        ).pack(fill="x", pady=2)
+
+        tk.Button(
             frame_btn, text="📂  Xem Anh Nguoi La",
             bg="#FF6D00", fg="white",
             font=("Arial", 9, "bold"),
@@ -375,149 +384,163 @@ class App:
         self._ghi_log("[■] Da dung theo doi.")
 
     def chup_anh_nguoi_quen(self):
-        """Mở cửa sổ chụp ảnh người quen trực tiếp trong app"""
+        """Mở cửa sổ chụp ảnh người quen"""
+        # Dừng camera chính nếu đang chạy
+        tam_dung = self.dang_chay
+        if self.dang_chay:
+            self.dang_chay = False
+            if self.cap:
+                self.cap.release()
+                self.cap = None
+            self.label_camera.config(image="", bg="#000000")
+            self._ghi_log("[~] Tam dung camera chinh.")
+
         win = tk.Toplevel(self.root)
         win.title("Chup Anh Nguoi Quen")
         win.configure(bg=BG_MAIN)
-        win.geometry("720x600")
         win.resizable(False, False)
 
         # Header
         tk.Label(win, text="📷  Chup Anh Nguoi Quen",
                  bg=BG_HEADER, fg="white",
-                 font=("Arial", 12, "bold")).pack(fill="x", ipady=10)
+                 font=("Arial", 12, "bold")).pack(fill="x", ipady=8)
 
         # Nhập tên
         frame_ten = tk.Frame(win, bg=BG_MAIN)
-        frame_ten.pack(fill="x", padx=12, pady=8)
-
+        frame_ten.pack(fill="x", padx=12, pady=6)
         tk.Label(frame_ten, text="Ten nguoi:",
                  bg=BG_MAIN, fg=CLR_TEXT,
                  font=("Arial", 10)).pack(side="left")
-
         entry_ten = tk.Entry(frame_ten, font=("Arial", 10), width=20)
         entry_ten.pack(side="left", padx=8)
         entry_ten.focus()
 
-        # Camera preview
-        label_preview = tk.Label(win, bg="#000000",
-                                  width=640, height=400)
-        label_preview.pack(padx=12)
+        # Camera — dùng frame cố định pixel
+        frame_cam = tk.Frame(win, bg="#000000", width=640, height=420)
+        frame_cam.pack(padx=12, pady=4)
+        frame_cam.pack_propagate(False)
+        label_preview = tk.Label(frame_cam, bg="#000000")
+        label_preview.pack(fill="both", expand=True)
 
-        # Thông tin
+        # Info
         label_info = tk.Label(win,
-                               text="Nhap ten roi nhan 'Bat Dau Chup'",
+                               text="Nhap ten → Bat Dau → Nhan S de chup",
                                bg=BG_MAIN, fg=CLR_BLUE,
-                               font=("Arial", 9))
-        label_info.pack(pady=4)
+                               font=("Arial", 9, "bold"))
+        label_info.pack(pady=2)
 
-        # Biến trạng thái cửa sổ chụp
-        state = {"chup": False, "cap": None, "dem": 0, "ten": ""}
+        state = {
+            "chup": False, "cap": None,
+            "dem": 0, "so_cu": 0,
+            "ten": "", "frame": None
+        }
 
-        def bat_dau_chup():
+        def bat_dau():
             ten = entry_ten.get().strip().replace(" ", "_")
             if not ten:
-                label_info.config(text="Hay nhap ten truoc!", fg=CLR_RED)
+                label_info.config(text="Hay nhap ten!", fg=CLR_RED)
                 return
             state["ten"]  = ten
             state["dem"]  = 0
             state["chup"] = True
             os.makedirs(f"known_faces/{ten}", exist_ok=True)
-
-            # Đếm ảnh cũ
             state["so_cu"] = len([
                 f for f in os.listdir(f"known_faces/{ten}")
                 if f.endswith(".jpg")
             ])
-
             state["cap"] = cv2.VideoCapture(0)
+            state["cap"].set(cv2.CAP_PROP_FRAME_WIDTH,  640)
+            state["cap"].set(cv2.CAP_PROP_FRAME_HEIGHT, 420)
             btn_bat_dau.config(state="disabled")
             btn_chup.config(state="normal")
             label_info.config(
-                text=f"Nhan S hoac nut 'Chup!' de chup",
-                fg=CLR_GREEN)
-            _cap_nhat_preview()
+                text=f"Nhan S de chup | 0 anh", fg=CLR_GREEN)
+            _loop()
 
-        def _cap_nhat_preview():
+        def _loop():
             if not state["chup"] or not state["cap"]:
                 return
             ret, frame = state["cap"].read()
             if ret:
-                rgb   = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                img   = Image.fromarray(rgb).resize((640, 400))
+                state["frame"] = frame
+                img   = Image.fromarray(
+                    cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                ).resize((640, 420))
                 imgtk = ImageTk.PhotoImage(img)
                 label_preview.imgtk = imgtk
                 label_preview.config(image=imgtk)
-                state["frame"] = frame
-            win.after(30, _cap_nhat_preview)
+            win.after(30, _loop)
 
-        def chup_anh():
-            if not state.get("frame") is not None and state["chup"]:
+        def chup():
+            if not state["chup"] or state["frame"] is None:
                 return
-            frame  = state.get("frame")
-            if frame is None:
-                return
-            ten    = state["ten"]
-            so_thu_tu = state["so_cu"] + state["dem"] + 1
-            path   = f"known_faces/{ten}/{ten}_{so_thu_tu}.jpg"
-            anh_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            Image.fromarray(anh_rgb).save(path, format="JPEG", quality=95)
+            so  = state["so_cu"] + state["dem"] + 1
+            p   = f"known_faces/{state['ten']}/{state['ten']}_{so}.jpg"
+            Image.fromarray(
+                cv2.cvtColor(state["frame"], cv2.COLOR_BGR2RGB)
+            ).save(p, format="JPEG", quality=95)
             state["dem"] += 1
             label_info.config(
-                text=f"Da chup {state['dem']} anh — Nhan them hoac Luu",
+                text=f"Da chup {state['dem']} anh | Nhan S tiep tuc",
                 fg=CLR_GREEN)
-            self._ghi_log(f"[📷] Chup anh {ten} ({state['dem']})")
 
-        def luu_va_dong():
+        def luu_dong():
             state["chup"] = False
             if state["cap"]:
                 state["cap"].release()
             if state["dem"] > 0:
+                self._ghi_log(
+                    f"[OK] Da chup {state['dem']} anh cho '{state['ten']}'")
                 self._cap_nhat_encoding_silent()
+            if tam_dung:
+                self.root.after(800, self.bat_dau)
             win.destroy()
 
-        def dong_khong_luu():
+        def huy():
             state["chup"] = False
             if state["cap"]:
                 state["cap"].release()
+            if tam_dung:
+                self.root.after(800, self.bat_dau)
             win.destroy()
 
-        # Bind phím S
-        win.bind("<s>", lambda e: chup_anh())
-        win.bind("<S>", lambda e: chup_anh())
+        win.bind("<s>", lambda e: chup())
+        win.bind("<S>", lambda e: chup())
 
-        # Nút
         frame_btn = tk.Frame(win, bg=BG_MAIN)
         frame_btn.pack(fill="x", padx=12, pady=6)
 
-        btn_bat_dau = tk.Button(frame_btn, text="▶  Bat Dau Chup",
-                                 bg=CLR_GREEN, fg="white",
-                                 font=("Arial", 9, "bold"),
-                                 relief="flat", pady=5, cursor="hand2",
-                                 bd=0, command=bat_dau_chup)
+        btn_bat_dau = tk.Button(
+            frame_btn, text="▶  Bat Dau",
+            bg=CLR_GREEN, fg="white",
+            font=("Arial", 9, "bold"),
+            relief="flat", pady=5, cursor="hand2",
+            bd=0, command=bat_dau)
         btn_bat_dau.pack(side="left", padx=4)
 
-        btn_chup = tk.Button(frame_btn, text="📸  Chup! (S)",
-                              bg=CLR_ORANGE, fg="white",
-                              font=("Arial", 9, "bold"),
-                              relief="flat", pady=5, cursor="hand2",
-                              state="disabled", bd=0,
-                              command=chup_anh)
+        btn_chup = tk.Button(
+            frame_btn, text="📸  Chup! (S)",
+            bg=CLR_ORANGE, fg="white",
+            font=("Arial", 9, "bold"),
+            relief="flat", pady=5, cursor="hand2",
+            state="disabled", bd=0, command=chup)
         btn_chup.pack(side="left", padx=4)
 
-        tk.Button(frame_btn, text="💾  Luu & Dong",
-                  bg=CLR_BLUE, fg="white",
-                  font=("Arial", 9, "bold"),
-                  relief="flat", pady=5, cursor="hand2",
-                  bd=0, command=luu_va_dong).pack(side="left", padx=4)
+        tk.Button(
+            frame_btn, text="💾  Luu & Dong",
+            bg=CLR_BLUE, fg="white",
+            font=("Arial", 9, "bold"),
+            relief="flat", pady=5, cursor="hand2",
+            bd=0, command=luu_dong).pack(side="left", padx=4)
 
-        tk.Button(frame_btn, text="✕  Huy",
-                  bg="#F1F3F4", fg=CLR_GRAY,
-                  font=("Arial", 9),
-                  relief="flat", pady=5, cursor="hand2",
-                  bd=0, command=dong_khong_luu).pack(side="left", padx=4)
+        tk.Button(
+            frame_btn, text="✕  Huy",
+            bg="#F1F3F4", fg=CLR_GRAY,
+            font=("Arial", 9),
+            relief="flat", pady=5, cursor="hand2",
+            bd=0, command=huy).pack(side="left", padx=4)
 
-        win.protocol("WM_DELETE_WINDOW", dong_khong_luu)
+        win.protocol("WM_DELETE_WINDOW", huy)
 
     def them_anh_tu_may(self):
         """Chọn ảnh từ máy tính, tự động xử lý vào known_faces"""
@@ -561,33 +584,97 @@ class App:
 
         self._ghi_log(f"[OK] Da them {dem} anh cho '{ten}'")
 
+        # Hiện popup xác nhận
+        from tkinter import messagebox
+        messagebox.showinfo(
+            "Them anh thanh cong!",
+            f"Da them {dem} anh cho '{ten}'\n"
+            f"Dang cap nhat encoding...",
+            parent=self.root
+        )
+
         # Cập nhật encodings ngay
         self._cap_nhat_encoding_silent()
 
     def _cap_nhat_encoding_silent(self):
-        """Chạy main.py --update trong background thread"""
+        """Xử lý ảnh mới trực tiếp trong app — không dùng subprocess"""
         self._ghi_log("[~] Dang cap nhat encoding...")
 
         def _run():
             try:
-                import subprocess, sys
-                python = sys.executable
-                result = subprocess.run(
-                    [python, "main.py", "--update"],
-                    capture_output=True, text=True, cwd=os.getcwd()
-                )
-                # Reload encodings vào bộ nhớ
-                self.known_embeddings, self.known_names = load_encodings()
+                folder = "known_faces"
+                if not os.path.exists(folder):
+                    return
+
+                # Load pkl cũ
+                if os.path.exists(ENCODING_FILE):
+                    with open(ENCODING_FILE, "rb") as f:
+                        data = pickle.load(f)
+                    known_embeddings = data["embeddings"]
+                    known_names      = data["names"]
+                    da_xu_ly         = set(data.get("da_xu_ly", []))
+                else:
+                    known_embeddings = []
+                    known_names      = []
+                    da_xu_ly         = set()
+
+                # Chỉ xử lý ảnh MỚI
+                anh_moi = 0
+                for ten in os.listdir(folder):
+                    duong_dan = os.path.join(folder, ten)
+                    if not os.path.isdir(duong_dan):
+                        continue
+                    for file in sorted(os.listdir(duong_dan)):
+                        if not file.endswith((".jpg", ".png")):
+                            continue
+                        path = os.path.join(duong_dan, file)
+                        if path in da_xu_ly:
+                            continue
+                        try:
+                            anh   = np.array(
+                                Image.open(path).convert("RGB"))
+                            faces = self.app_insight.get(anh)
+                            faces = [f for f in faces
+                                     if f.det_score >= NGUONG_DETECT]
+                            if not faces:
+                                da_xu_ly.add(path)
+                                continue
+                            face = max(faces, key=lambda f: f.det_score)
+                            known_embeddings.append(face.normed_embedding)
+                            known_names.append(ten)
+                            da_xu_ly.add(path)
+                            anh_moi += 1
+                        except Exception as e:
+                            print(f"Loi {file}: {e}")
+
+                # Lưu pkl
+                with open(ENCODING_FILE, "wb") as f:
+                    pickle.dump({
+                        "embeddings": known_embeddings,
+                        "names":      known_names,
+                        "da_xu_ly":   da_xu_ly
+                    }, f)
+
+                # Reload vào bộ nhớ app NGAY
+                self.known_embeddings = list(known_embeddings)
+                self.known_names      = list(known_names)
+
                 so_nguoi = len(set(self.known_names))
                 so_anh   = len(self.known_embeddings)
 
                 def _ui():
                     self.label_db.config(text=str(so_anh))
                     self.label_so_quen.config(text=str(so_nguoi))
+                    self.label_trang_thai.config(
+                        text=f"Cap nhat xong!\n{so_anh} anh / {so_nguoi} nguoi",
+                        bg="#E6F4EA", fg=CLR_GREEN)
                     self._ghi_log(
                         f"[OK] Cap nhat xong: "
-                        f"{so_anh} anh / {so_nguoi} nguoi")
+                        f"+{anh_moi} anh moi | "
+                        f"Tong: {so_anh} anh / {so_nguoi} nguoi")
+
                 self.root.after(0, _ui)
+
             except Exception as e:
                 self.root.after(0,
                     lambda: self._ghi_log(f"[LOI] {e}"))
@@ -686,103 +773,452 @@ class App:
         self.log_text.see("end")
         self.log_text.config(state="disabled")
 
-    def xem_anh_nguoi_la(self):
-        folder = "unknown_log"
+    def quan_ly_nguoi_quen(self):
+        """Cửa sổ quản lý — xem và xóa người quen"""
+        from tkinter import messagebox
+
+        folder = "known_faces"
         if not os.path.exists(folder):
-            self._ghi_log("[!] Chua co anh nguoi la nao.")
+            self._ghi_log("[!] Chua co nguoi quen nao.")
             return
 
-        files = sorted([
-            f for f in os.listdir(folder)
-            if f.endswith(".jpg")
-        ], reverse=True)  # mới nhất lên đầu
+        nguoi_list = [
+            d for d in os.listdir(folder)
+            if os.path.isdir(os.path.join(folder, d))
+        ]
 
-        if not files:
-            self._ghi_log("[!] Thu muc unknown_log trong.")
+        if not nguoi_list:
+            self._ghi_log("[!] Danh sach nguoi quen trong.")
             return
 
-        # Mở cửa sổ gallery
         win = tk.Toplevel(self.root)
-        win.title(f"Kho Anh Nguoi La ({len(files)} anh)")
+        win.title("Quan Ly Nguoi Quen")
         win.configure(bg=BG_MAIN)
-        win.geometry("860x580")
-        win.resizable(True, True)
+        win.geometry("500x500")
+        win.resizable(False, False)
 
         # Header
         tk.Label(win,
-                 text=f"📂  Kho Anh Nguoi La  —  {len(files)} anh",
+                 text=f"👥  Quan Ly Nguoi Quen  —  {len(nguoi_list)} nguoi",
                  bg=BG_HEADER, fg="white",
-                 font=("Arial", 12, "bold")
-                 ).pack(fill="x", ipady=10)
+                 font=("Arial", 12, "bold")).pack(fill="x", ipady=10)
 
-        # Frame cuộn
+        tk.Label(win,
+                 text="Chon nguoi muon xoa roi nhan nut Xoa:",
+                 bg=BG_MAIN, fg=CLR_SUB,
+                 font=("Arial", 9)).pack(anchor="w", padx=12, pady=(8, 4))
+
+        # Frame danh sách
+        frame_list = tk.Frame(win, bg=BG_MAIN)
+        frame_list.pack(fill="both", expand=True, padx=12, pady=4)
+
+        scrollbar = tk.Scrollbar(frame_list)
+        scrollbar.pack(side="right", fill="y")
+
+        listbox = tk.Listbox(
+            frame_list,
+            font=("Arial", 11),
+            selectmode="single",
+            bg=BG_CARD, fg=CLR_TEXT,
+            selectbackground=CLR_BLUE,
+            selectforeground="white",
+            relief="flat",
+            yscrollcommand=scrollbar.set,
+            highlightthickness=1,
+            highlightbackground="#DADCE0"
+        )
+        listbox.pack(side="left", fill="both", expand=True)
+        scrollbar.config(command=listbox.yview)
+
+        # Điền danh sách người quen
+        def refresh_list():
+            listbox.delete(0, "end")
+            nguoi_list2 = [
+                d for d in os.listdir(folder)
+                if os.path.isdir(os.path.join(folder, d))
+            ]
+            for ten in sorted(nguoi_list2):
+                so_anh = len([
+                    f for f in os.listdir(os.path.join(folder, ten))
+                    if f.endswith((".jpg", ".png"))
+                ])
+                listbox.insert("end", f"  👤  {ten}  ({so_anh} anh)")
+            return nguoi_list2
+
+        ds = refresh_list()
+
+        # Thông tin chọn
+        label_chon = tk.Label(win,
+                               text="Chua chon ai",
+                               bg=BG_MAIN, fg=CLR_SUB,
+                               font=("Arial", 9))
+        label_chon.pack(pady=4)
+
+        def on_select(evt):
+            sel = listbox.curselection()
+            if sel:
+                ten = ds[sel[0]]
+                label_chon.config(
+                    text=f"Da chon: {ten}",
+                    fg=CLR_RED)
+
+        listbox.bind("<<ListboxSelect>>", on_select)
+
+        def xoa_nguoi():
+            sel = listbox.curselection()
+            if not sel:
+                messagebox.showwarning(
+                    "Chua chon", "Hay chon nguoi muon xoa!",
+                    parent=win)
+                return
+
+            ten = ds[sel[0]]
+            xac_nhan = messagebox.askyesno(
+                "Xac nhan xoa",
+                f"Ban co chac muon xoa '{ten}'?\n"
+                f"Tat ca anh cua nguoi nay se bi xoa!",
+                parent=win
+            )
+            if not xac_nhan:
+                return
+
+            # Xóa thư mục ảnh
+            import shutil
+            shutil.rmtree(os.path.join(folder, ten))
+            self._ghi_log(f"[OK] Da xoa anh cua '{ten}'.")
+
+            # Xóa trực tiếp khỏi bộ nhớ — không xóa người khác!
+            if os.path.exists(ENCODING_FILE):
+                with open(ENCODING_FILE, "rb") as f:
+                    data = pickle.load(f)
+
+                # Lọc bỏ embeddings của người bị xóa
+                moi_emb  = []
+                moi_name = []
+                moi_daxl = set()
+                for emb, name, path_xl in zip(
+                    data["embeddings"],
+                    data["names"],
+                    data.get("da_xu_ly", [])
+                ):
+                    if name != ten:
+                        moi_emb.append(emb)
+                        moi_name.append(name)
+                        moi_daxl.add(path_xl)
+
+                # Lưu pkl mới không có người bị xóa
+                with open(ENCODING_FILE, "wb") as f:
+                    pickle.dump({
+                        "embeddings": moi_emb,
+                        "names":      moi_name,
+                        "da_xu_ly":   moi_daxl
+                    }, f)
+
+                # Reload vào bộ nhớ app NGAY LẬP TỨC
+                self.known_embeddings = list(moi_emb)
+                self.known_names      = list(moi_name)
+
+                so_nguoi = len(set(self.known_names))
+                so_anh   = len(self.known_embeddings)
+
+                # Cập nhật UI
+                self.label_db.config(text=str(so_anh))
+                self.label_so_quen.config(text=str(so_nguoi))
+                self.label_trang_thai.config(
+                    text=f"Da xoa '{ten}'\nCon lai: {so_anh} anh / {so_nguoi} nguoi",
+                    bg="#E6F4EA", fg=CLR_GREEN)
+                self._ghi_log(
+                    f"[OK] Con lai: {so_anh} anh / {so_nguoi} nguoi")
+
+            # Refresh list
+            ds.clear()
+            ds.extend([
+                d for d in os.listdir(folder)
+                if os.path.isdir(os.path.join(folder, d))
+            ])
+            refresh_list()
+            label_chon.config(text="Da xoa thanh cong!", fg=CLR_GREEN)
+
+        tk.Button(win,
+                  text="🗑  Xoa Nguoi Nay",
+                  bg=CLR_RED, fg="white",
+                  font=("Arial", 10, "bold"),
+                  relief="flat", pady=8, cursor="hand2",
+                  bd=0, command=xoa_nguoi
+                  ).pack(fill="x", padx=12, pady=(4, 2))
+
+        tk.Button(win,
+                  text="✕  Dong",
+                  bg="#F1F3F4", fg=CLR_GRAY,
+                  font=("Arial", 9),
+                  relief="flat", pady=6, cursor="hand2",
+                  bd=0, command=win.destroy
+                  ).pack(fill="x", padx=12, pady=(0, 12))
+
+    def xem_anh_nguoi_la(self):
+        folder = "unknown_log"
+        if not os.path.exists(folder) or not any(
+            f.endswith(".jpg") for f in os.listdir(folder)
+        ):
+            self._ghi_log("[!] Chua co anh nguoi la nao.")
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title("Kho Anh Nguoi La")
+        win.configure(bg=BG_MAIN)
+        win.geometry("920x620")
+        win.resizable(True, True)
+
+        # Header
+        label_header = tk.Label(win,
+                 text="📂  Kho Anh Nguoi La",
+                 bg=BG_HEADER, fg="white",
+                 font=("Arial", 12, "bold"))
+        label_header.pack(fill="x", ipady=8)
+
+        # ── Bộ lọc ──
+        frame_loc = tk.Frame(win, bg=BG_CARD,
+                              highlightthickness=1,
+                              highlightbackground="#DADCE0")
+        frame_loc.pack(fill="x", padx=10, pady=(6, 2))
+
+        tk.Label(frame_loc, text="🔍  Loc theo ngay:",
+                 bg=BG_CARD, fg=CLR_TEXT,
+                 font=("Arial", 9, "bold")).pack(side="left", padx=8, pady=6)
+
+        # Lấy danh sách ngày có ảnh
+        all_files = sorted([
+            f for f in os.listdir(folder) if f.endswith(".jpg")
+        ], reverse=True)
+
+        ngay_list = ["Tat ca"]
+        seen = set()
+        for f in all_files:
+            try:
+                t = datetime.strptime(f.replace(".jpg",""), "%Y%m%d_%H%M%S")
+                ngay = t.strftime("%d/%m/%Y")
+                if ngay not in seen:
+                    ngay_list.append(ngay)
+                    seen.add(ngay)
+            except:
+                pass
+
+        var_loc = tk.StringVar(value="Tat ca")
+        combo_ngay = ttk.Combobox(frame_loc,
+                                   textvariable=var_loc,
+                                   values=ngay_list,
+                                   state="readonly", width=14,
+                                   font=("Arial", 9))
+        combo_ngay.pack(side="left", padx=4)
+
+        label_dem = tk.Label(frame_loc, text=f"Tong: {len(all_files)} anh",
+                              bg=BG_CARD, fg=CLR_SUB,
+                              font=("Arial", 9))
+        label_dem.pack(side="left", padx=12)
+
+        # Trạng thái chọn ảnh
+        anh_da_chon = set()
+        label_chon_info = tk.Label(frame_loc,
+                                    text="Nhan vao anh de chon xoa",
+                                    bg=BG_CARD, fg=CLR_SUB,
+                                    font=("Arial", 9))
+        label_chon_info.pack(side="left", padx=8)
+
+        # ── Gallery ──
         frame_outer = tk.Frame(win, bg=BG_MAIN)
-        frame_outer.pack(fill="both", expand=True, padx=10, pady=10)
+        frame_outer.pack(fill="both", expand=True, padx=10, pady=4)
 
-        canvas   = tk.Canvas(frame_outer, bg=BG_MAIN,
-                              highlightthickness=0)
+        canvas    = tk.Canvas(frame_outer, bg=BG_MAIN, highlightthickness=0)
         scrollbar = tk.Scrollbar(frame_outer, orient="vertical",
                                   command=canvas.yview)
         frame_grid = tk.Frame(canvas, bg=BG_MAIN)
 
         frame_grid.bind("<Configure>", lambda e: canvas.configure(
             scrollregion=canvas.bbox("all")))
-
         canvas.create_window((0, 0), window=frame_grid, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
-
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        # Hiển thị ảnh dạng grid 4 cột
-        COLS     = 4
-        THUMB_W  = 180
-        THUMB_H  = 135
+        # Scroll bằng chuột
+        canvas.bind_all("<MouseWheel>",
+                         lambda e: canvas.yview_scroll(
+                             int(-1*(e.delta/120)), "units"))
 
-        for i, filename in enumerate(files):
-            path = os.path.join(folder, filename)
-            try:
-                img   = Image.open(path).resize((THUMB_W, THUMB_H))
-                imgtk = ImageTk.PhotoImage(img)
+        COLS   = 4
+        THUMB  = 190
 
-                row = i // COLS
-                col = i % COLS
+        card_widgets = {}  # filename -> (card_frame, border_color)
 
-                # Card từng ảnh
-                card = tk.Frame(frame_grid, bg=BG_CARD,
-                                highlightthickness=1,
-                                highlightbackground="#DADCE0")
-                card.grid(row=row, column=col,
-                          padx=6, pady=6, sticky="nsew")
+        def toggle_chon(filename, card):
+            if filename in anh_da_chon:
+                anh_da_chon.remove(filename)
+                card.config(highlightbackground="#DADCE0",
+                             highlightthickness=1)
+            else:
+                anh_da_chon.add(filename)
+                card.config(highlightbackground=CLR_RED,
+                             highlightthickness=3)
+            n = len(anh_da_chon)
+            if n > 0:
+                label_chon_info.config(
+                    text=f"Da chon {n} anh",
+                    fg=CLR_RED)
+            else:
+                label_chon_info.config(
+                    text="Nhan vao anh de chon xoa",
+                    fg=CLR_SUB)
 
-                lbl_img = tk.Label(card, image=imgtk, bg=BG_CARD)
-                lbl_img.image = imgtk  # giữ reference
-                lbl_img.pack()
+        def hien_anh(files_hien):
+            # Xóa grid cũ
+            for w in frame_grid.winfo_children():
+                w.destroy()
+            card_widgets.clear()
+            anh_da_chon.clear()
+            label_chon_info.config(
+                text="Nhan vao anh de chon xoa", fg=CLR_SUB)
 
-                # Tên file = thời gian phát hiện
+            label_dem.config(text=f"Tong: {len(files_hien)} anh")
+            label_header.config(
+                text=f"📂  Kho Anh Nguoi La  —  {len(files_hien)} anh")
+
+            for i, filename in enumerate(files_hien):
+                path = os.path.join(folder, filename)
                 try:
-                    t = datetime.strptime(
-                        filename.replace(".jpg", ""), "%Y%m%d_%H%M%S")
-                    ten_hien = t.strftime("📅 %d/%m/%Y  🕐 %H:%M:%S")
+                    img   = Image.open(path).resize((THUMB, THUMB))
+                    imgtk = ImageTk.PhotoImage(img)
+
+                    row = i // COLS
+                    col = i % COLS
+
+                    card = tk.Frame(frame_grid, bg=BG_CARD,
+                                    highlightthickness=1,
+                                    highlightbackground="#DADCE0",
+                                    cursor="hand2")
+                    card.grid(row=row, column=col,
+                              padx=5, pady=5, sticky="nsew")
+
+                    lbl_img = tk.Label(card, image=imgtk,
+                                        bg=BG_CARD, cursor="hand2")
+                    lbl_img.image = imgtk
+                    lbl_img.pack()
+
+                    # Timestamp
+                    try:
+                        t = datetime.strptime(
+                            filename.replace(".jpg",""), "%Y%m%d_%H%M%S")
+                        ts = t.strftime("%d/%m/%Y  %H:%M:%S")
+                    except:
+                        ts = filename
+
+                    frame_ts = tk.Frame(card, bg="#EA4335")
+                    frame_ts.pack(fill="x")
+                    tk.Label(frame_ts, text=f"🕐  {ts}",
+                             bg="#EA4335", fg="white",
+                             font=("Arial", 9, "bold"),
+                             pady=3).pack()
+
+                    # Nhấn để chọn/bỏ chọn
+                    fn = filename
+                    card.bind("<Button-1>",
+                               lambda e, f=fn, c=card: toggle_chon(f, c))
+                    lbl_img.bind("<Button-1>",
+                                  lambda e, f=fn, c=card: toggle_chon(f, c))
+
+                    card_widgets[filename] = card
+
+                except Exception as e:
+                    print(f"Loi {filename}: {e}")
+
+        def loc_anh(*args):
+            ngay = var_loc.get()
+            if ngay == "Tat ca":
+                hien_anh(all_files)
+            else:
+                loc = [f for f in all_files if
+                       datetime.strptime(
+                           f.replace(".jpg",""), "%Y%m%d_%H%M%S"
+                       ).strftime("%d/%m/%Y") == ngay]
+                hien_anh(loc)
+
+        combo_ngay.bind("<<ComboboxSelected>>", loc_anh)
+        hien_anh(all_files)
+
+        # ── Nút dưới ──
+        frame_bottom = tk.Frame(win, bg=BG_MAIN)
+        frame_bottom.pack(fill="x", padx=10, pady=(4, 8))
+
+        def xoa_da_chon():
+            if not anh_da_chon:
+                from tkinter import messagebox
+                messagebox.showwarning(
+                    "Chua chon", "Nhan vao anh muon xoa truoc!",
+                    parent=win)
+                return
+            from tkinter import messagebox
+            ok = messagebox.askyesno(
+                "Xac nhan",
+                f"Xoa {len(anh_da_chon)} anh da chon?",
+                parent=win)
+            if not ok:
+                return
+            for fn in list(anh_da_chon):
+                try:
+                    os.remove(os.path.join(folder, fn))
+                    all_files.remove(fn)
                 except:
-                    ten_hien = filename
+                    pass
+            self._ghi_log(f"[OK] Da xoa {len(anh_da_chon)} anh nguoi la.")
+            self.tong_canh_bao = max(0, self.tong_canh_bao - len(anh_da_chon))
+            self.label_so_la.config(text=str(self.tong_canh_bao))
+            loc_anh()
 
-                tk.Label(card, text=ten_hien,
-                         bg=BG_CARD, fg="#EA4335",
-                         font=("Arial", 7, "bold")).pack(pady=(2, 4))
-
-            except Exception as e:
-                print(f"Loi load anh {filename}: {e}")
-
-        # Nút xóa toàn bộ
-        tk.Button(win,
-                  text="🗑  Xoa Tat Ca Anh Nguoi La",
+        tk.Button(frame_bottom,
+                  text="🗑  Xoa Anh Da Chon",
                   bg=CLR_RED, fg="white",
                   font=("Arial", 10, "bold"),
-                  relief="flat", pady=8, cursor="hand2",
-                  bd=0,
+                  relief="flat", pady=7, cursor="hand2", bd=0,
+                  command=xoa_da_chon
+                  ).pack(side="left", padx=4)
+
+        tk.Button(frame_bottom,
+                  text="☑  Chon Tat Ca",
+                  bg="#37474F", fg="white",
+                  font=("Arial", 9, "bold"),
+                  relief="flat", pady=7, cursor="hand2", bd=0,
+                  command=lambda: [
+                      anh_da_chon.update(
+                          card_widgets.keys()),
+                      [c.config(highlightbackground=CLR_RED,
+                                highlightthickness=3)
+                       for c in card_widgets.values()],
+                      label_chon_info.config(
+                          text=f"Da chon {len(anh_da_chon)} anh",
+                          fg=CLR_RED)
+                  ]).pack(side="left", padx=4)
+
+        tk.Button(frame_bottom,
+                  text="✕  Bo Chon Tat Ca",
+                  bg="#F1F3F4", fg=CLR_GRAY,
+                  font=("Arial", 9),
+                  relief="flat", pady=7, cursor="hand2", bd=0,
+                  command=lambda: [
+                      anh_da_chon.clear(),
+                      [c.config(highlightbackground="#DADCE0",
+                                highlightthickness=1)
+                       for c in card_widgets.values()],
+                      label_chon_info.config(
+                          text="Nhan vao anh de chon xoa",
+                          fg=CLR_SUB)
+                  ]).pack(side="left", padx=4)
+
+        tk.Button(frame_bottom,
+                  text="🗑  Xoa Tat Ca",
+                  bg="#B71C1C", fg="white",
+                  font=("Arial", 9),
+                  relief="flat", pady=7, cursor="hand2", bd=0,
                   command=lambda: self._xoa_tat_ca_nguoi_la(win)
-                  ).pack(fill="x", padx=10, pady=(0, 10))
+                  ).pack(side="right", padx=4)
 
     def _xoa_tat_ca_nguoi_la(self, win):
         folder = "unknown_log"
