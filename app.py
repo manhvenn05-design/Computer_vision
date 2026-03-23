@@ -1210,9 +1210,9 @@ class App:
         ]
 
         thanh_vien = [
-            ("Nguyễn Khánh Duy",  "MSSV: ..."),
-            ("Nguyễn Trọng Mạnh", "MSSV: ..."),
-            ("Hoàng Minh Thắng",  "MSSV: ..."),
+            ("Nguyễn Văn Thân",  "MSSV: 235748020110172"),
+            ("Nguyễn Trọng Mạnh", "MSSV: 235748020110259"),
+            ("Hoàng Minh Thắng",  "MSSV: 235748020110039"),
         ]
 
         for nhan, gia_tri in info:
