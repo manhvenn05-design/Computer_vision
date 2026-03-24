@@ -1,4 +1,4 @@
-# 🏠 Hệ Thống Nhận Diện Người Lạ Vào Nhà
+# Hệ Thống Nhận Diện Người Lạ Vào Nhà
 
 > Đồ án môn **Thị Giác Máy Tính** — Nhóm 6 — Trường Đại Học Vinh
 
@@ -9,19 +9,19 @@
 
 ---
 
-## 📌 Giới thiệu
+##  Giới thiệu
 
 Hệ thống sử dụng camera realtime để **phát hiện và cảnh báo khi có người lạ** xuất hiện trong khu vực giám sát. Ứng dụng tích hợp giao diện đồ họa trực quan, hỗ trợ quản lý người quen, lưu ảnh bằng chứng và cảnh báo âm thanh + popup tức thì.
 
 ---
 
-## 👥 Thông tin nhóm
+## Thông tin nhóm
 
 | Họ và tên | MSSV | Vai trò |
 |---|---|---|
-| Nguyễn Khánh Duy | ... | Lập trình chính |
-| Nguyễn Trọng Mạnh | ... | Giao diện + Testing |
-| Hoàng Minh Thắng | ... | Báo cáo + Slide |
+| Nguyễn Trọng Mạnh |
+| Nguyễn Văn Thân | 
+| Hoàng Minh Thắng | 
 
 - **Giáo viên hướng dẫn:** Nguyễn Thị Minh Tâm
 - **Môn học:** Thị Giác Máy Tính
@@ -29,7 +29,7 @@ Hệ thống sử dụng camera realtime để **phát hiện và cảnh báo kh
 
 ---
 
-## 🧠 Giải thích thuật toán
+## Giải thích thuật toán
 
 Hệ thống hoạt động theo pipeline 2 tầng:
 
@@ -57,9 +57,8 @@ Embeddings được cache vào `encodings.pkl` — lần sau khởi động load
 
 ---
 
-## 🖥️ Giao diện
+##  Giao diện
 
-> *(Chụp màn hình giao diện và thay thế ảnh bên dưới)*
 
 ### Màn hình chính
 ![Giao diện chính](screenshots/main.png)
@@ -75,7 +74,7 @@ Embeddings được cache vào `encodings.pkl` — lần sau khởi động load
 
 ---
 
-## 📁 Cấu trúc thư mục
+##  Cấu trúc thư mục
 
 ```
 face_final/
@@ -101,7 +100,7 @@ face_final/
 
 ---
 
-## ⚙️ Cài đặt môi trường
+## Cài đặt môi trường
 
 ### Yêu cầu hệ thống
 - Windows 10/11 (64-bit)
@@ -139,7 +138,7 @@ OK!
 
 ---
 
-## 🚀 Hướng dẫn chạy
+##  Hướng dẫn chạy
 
 ### Chạy ứng dụng
 
@@ -152,9 +151,9 @@ python app.py
 ### Lần đầu sử dụng
 
 ```
-1. Nhấn "📷 Chụp Ảnh Người Quen" → nhập tên → chụp 15+ ảnh đa góc
+1. Nhấn " Chụp Ảnh Người Quen" → nhập tên → chụp 15+ ảnh đa góc
    HOẶC
-   Nhấn "🖼 Thêm Ảnh Từ Máy" → chọn ảnh có sẵn từ máy tính
+   Nhấn "Thêm Ảnh Từ Máy" → chọn ảnh có sẵn từ máy tính
 
 2. Nhấn "▶ Bắt Đầu" → hệ thống tự động xử lý ảnh và bắt đầu theo dõi
 
@@ -180,7 +179,7 @@ python app.py
 
 ---
 
-## 🛠️ Công nghệ sử dụng
+##  Công nghệ sử dụng
 
 | Công nghệ | Phiên bản | Mục đích |
 |---|---|---|
@@ -195,7 +194,7 @@ python app.py
 
 ---
 
-## ⚠️ Lưu ý
+## Lưu ý
 
 - Lần đầu chạy InsightFace sẽ **tự tải model** (~500MB) — cần internet
 - Nên chụp **15-20 ảnh/người** với nhiều góc độ khác nhau để nhận diện tốt hơn
@@ -203,7 +202,7 @@ python app.py
 
 ---
 
-## 📈 Hướng phát triển
+##  Hướng phát triển
 
 - Tích hợp SQLite để lưu lịch sử cảnh báo lâu dài
 - Hỗ trợ nhiều camera cùng lúc
@@ -213,6 +212,6 @@ python app.py
 
 ---
 
-## 📄 License
+## License
 
 MIT License — Sử dụng tự do cho mục đích học tập và nghiên cứu.
