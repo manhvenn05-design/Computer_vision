@@ -72,7 +72,6 @@ def luu_nguoi_la(frame, ket_qua):
     cv2.imwrite(f"unknown_log/{ten_file}", anh_luu)
     return ten_file
 
-
 class App:
     def __init__(self, root):
         self.root  = root
@@ -375,7 +374,7 @@ class App:
         label_preview.pack(fill="both", expand=True)
 
         label_info = tk.Label(win,
-                               text="Nhập tên → Bắt Đầu → Nhấn S để chụp",
+                               text="Nhập tên → Bắt Đầu → Nhấn chụp",
                                bg=BG_MAIN, fg=CLR_BLUE,
                                font=("Segoe UI", 9, "bold"))
         label_info.pack(pady=2)
@@ -400,7 +399,7 @@ class App:
             state["cap"].set(cv2.CAP_PROP_FRAME_HEIGHT, 420)
             btn_bat_dau.config(state="disabled")
             btn_chup.config(state="normal")
-            label_info.config(text="Nhấn S để chụp | 0 ảnh", fg=CLR_GREEN)
+            label_info.config(text="Nhấn chụp | 0 ảnh", fg=CLR_GREEN)
             _loop()
 
         def _loop():
@@ -461,7 +460,7 @@ class App:
                                  bd=0, command=bat_dau)
         btn_bat_dau.pack(side="left", padx=4)
 
-        btn_chup = tk.Button(frame_btn, text="📸  Chụp! (S)",
+        btn_chup = tk.Button(frame_btn, text="📸  Chụp",
                               bg=CLR_ORANGE, fg="white",
                               font=("Segoe UI", 9, "bold"),
                               relief="flat", pady=5, cursor="hand2",
