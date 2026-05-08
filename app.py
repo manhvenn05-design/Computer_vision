@@ -169,12 +169,12 @@ class App:
                 tk.Frame(frame_stat, bg="#DADCE0",
                          width=1).pack(side="left", fill="y", padx=8)
 
-        # Cột phải: Điều khiển
+        
         col_phai = tk.Frame(body, bg=BG_MAIN, width=300)
         col_phai.pack(side="left", fill="y", padx=(10, 0))
         col_phai.pack_propagate(False)
 
-        # Card trạng thái
+        
         card_tt = self._card(col_phai)
         card_tt.pack(fill="x", pady=(0, 8))
 
@@ -192,7 +192,7 @@ class App:
         )
         self.label_trang_thai.pack(fill="x", padx=12, pady=8)
 
-        # Card điều khiển
+        
         card_dk = self._card(col_phai)
         card_dk.pack(fill="x", pady=(0, 8))
 
@@ -249,7 +249,7 @@ class App:
                   relief="flat", pady=6, cursor="hand2",
                   bd=0, command=self.ve_chung_toi).pack(fill="x", pady=(8, 2))
 
-        # Card log
+        
         card_log = self._card(col_phai)
         card_log.pack(fill="both", expand=True)
 
