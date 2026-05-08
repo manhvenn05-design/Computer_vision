@@ -55,7 +55,7 @@ def luu_nguoi_la(frame, ket_qua):
     ten_file = datetime.now().strftime("%Y%m%d_%H%M%S") + ".jpg"
     anh_luu = frame.copy()
 
-    # Vẽ khung xanh cho người quen, đỏ cho người lạ
+    
     for (box, ten, do_cx, mau) in ket_qua:
         cv2.rectangle(anh_luu, (box[0], box[1]), (box[2], box[3]), mau, 2)
         cv2.rectangle(anh_luu, (box[0], box[3] - 32), (box[2], box[3]), mau, cv2.FILLED)
@@ -63,7 +63,7 @@ def luu_nguoi_la(frame, ket_qua):
         cv2.putText(anh_luu, nhan, (box[0] + 4, box[3] - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
 
-    # Vẽ timestamp góc trên trái
+    
     gio = datetime.now().strftime("%d/%m/%Y  %H:%M:%S")
     cv2.rectangle(anh_luu, (0, 0), (280, 28), (0, 0, 0), cv2.FILLED)
     cv2.putText(anh_luu, gio, (6, 20), cv2.FONT_HERSHEY_SIMPLEX,
@@ -120,11 +120,11 @@ class App:
         self.label_gio.pack(side="right", padx=16)
         self._cap_nhat_gio()
 
-        # Body
+        
         body = tk.Frame(self.root, bg=BG_MAIN)
         body.pack(fill="both", expand=True, padx=12, pady=10)
 
-        # Cột trái: Camera
+        
         col_trai = tk.Frame(body, bg=BG_MAIN)
         col_trai.pack(side="left", fill="both", expand=True)
 
@@ -143,7 +143,7 @@ class App:
         self.label_camera = tk.Label(frame_cam_inner, bg="#000000")
         self.label_camera.pack(fill="both", expand=True)
 
-        # Thống kê
+        
         card_stat = self._card(col_trai)
         card_stat.pack(fill="x")
 
